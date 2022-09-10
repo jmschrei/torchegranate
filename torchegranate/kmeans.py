@@ -9,19 +9,21 @@ from apricot import FeatureBasedSelection
 
 def _initialize_centroids(X, k, algorithm='first-k'):
 	if algorithm == 'first-k':
-		return X[:k]
+		return torch.clone(X[:k])
 
 	elif algorithm == 'random':
 		idxs = torch.arange(X.shape[0])
 		torch.shuffle(idxs)
-		return X[idxs[:k]]
+		return torch.clone(X[idxs[:k]])
 
 	elif algorithm == 'submodular-facility-location':
-		selector = FacilityLocationSelection(k=k)
-		return selector.fit_transform(X)
+		selector = FacilityLocationSelection(k)
+		a = selector.fit_transform(X)
+		print(type(a), a.shape)
+		dawdwadaw
 
 	elif algorithm == 'submodular-feature-based':
-		selector = FeatureBasedSelection(k=k)
+		selector = FeatureBasedSelection(k)
 		return selector.fit_transform(X)
 
 	elif algorithm == 'KMeans':
@@ -61,7 +63,7 @@ class KMeans():
 
 
 	def _initialize(self, X):
-		self.centroids = _initialize_centroids(X, self.k)
+		self.centroids = _initialize_centroids(X, self.k, algorithm=self.init)
 		self.d = X.shape[1]
 		self._initialized = True
 		self._reset_cache()
@@ -109,7 +111,7 @@ class KMeans():
 		return self
 
 
-n = 10000
+n = 1000
 d = 20
 k = 3
 
@@ -122,7 +124,7 @@ X = torch.cat(xs)
 centroids = torch.stack([x.mean(axis=0) for x in xs])
 
 tic = time.time()
-model = KMeans(k=k, init='first-k').fit(X)
+model = KMeans(k=k, init='submodular-facility-location').fit(X)
 toc1 = time.time() - tic
 
 toc2 = 0
