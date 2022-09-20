@@ -37,11 +37,9 @@ class Poisson():
 		self.log_lambdas = log_lambdas
 		#self.clear_summaries()
 
-'''
 import numpy
 import time 
 
-from pomegranate import MultivariateGaussianDistribution
 from pomegranate import IndependentComponentsDistribution
 from pomegranate import PoissonDistribution
 
@@ -69,4 +67,3 @@ toc2 = time.time() - tic
 print(toc1, logp1.sum())
 print(toc2, logp2.sum())
 print(numpy.abs(logp1 - logp2.numpy()).sum())
-'''

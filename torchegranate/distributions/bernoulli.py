@@ -66,7 +66,7 @@ class Bernoulli():
 		self._inv_log_probabilities = torch.log(1. - self._counts / self._total_counts)
 		self._reset_cache()
 
-'''
+
 import numpy
 import time 
 
@@ -74,10 +74,10 @@ from pomegranate import MultivariateGaussianDistribution
 from pomegranate import IndependentComponentsDistribution
 from pomegranate import DiscreteDistribution
 
-from multinomial import Multinomial
+from categorical import Multinomial
 
-d = 500
-n = 500000
+d = 100
+n = 50000
 k = 2
 
 X = numpy.random.choice(k, size=(n, d))
@@ -85,9 +85,8 @@ mu = numpy.abs(numpy.random.randn(k, d))
 mu = mu / mu.sum(axis=0, keepdims=True)
 
 tic = time.time()
-#d1 = IndependentComponentsDistribution.from_samples(X, distributions=DiscreteDistribution)
-#logp1 = d1.log_probability(X)
-logp1=numpy.array([0, 0, 0])
+d1 = IndependentComponentsDistribution.from_samples(X, distributions=DiscreteDistribution)
+logp1 = d1.log_probability(X)
 toc1 = time.time() - tic
 
 X = torch.tensor(X, dtype=torch.int64)
@@ -105,15 +104,16 @@ toc2 = time.time() - tic
 X = torch.tensor(X, dtype=torch.float32)
 
 tic = time.time()
-d3 = Binomial(mu[1])
+d3 = Bernoulli(mu[1])
 d3.summarize(X)
 d3.from_summaries()
 logp3 = d3.log_probability(X)
 toc3 = time.time() - tic
 
 
-print(toc1, logp1.sum())
-print(toc2, logp2.sum())
-print(toc3, logp3.sum())
+print("Categorical Distribution Fitting and Logp")
+print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
+print("torchegranate (categorical) time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
+print("torchegranate (bernoulli) time: {:4.4}, torchegranate logp: {:4.4}".format(toc3, logp3.sum()))
+
 print(numpy.abs(logp1 - logp2.numpy()).sum())
-'''

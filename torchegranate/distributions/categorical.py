@@ -66,7 +66,7 @@ class Multinomial():
 	def from_summaries(self):
 		self.log_probabilities = torch.log(self._counts / self._counts.sum(axis=0, keepdims=True))
 
-'''
+
 import numpy
 import time 
 
@@ -93,12 +93,14 @@ mu = torch.tensor(mu, dtype=torch.float32)
 
 tic = time.time()
 d2 = Multinomial(mu)
-#d2.summarize(X)
-#d2.from_summaries()
+d2.summarize(X)
+d2.from_summaries()
 logp2 = d2.log_probability(X)
 toc2 = time.time() - tic
 
-print(toc1, logp1.sum())
-print(toc2, logp2.sum())
+
+
+print("Categorical Distribution Fitting and Logp")
+print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
+print("torchegranate time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
 print(numpy.abs(logp1 - logp2.numpy()).sum())
-'''
