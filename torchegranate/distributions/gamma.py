@@ -8,10 +8,6 @@ from _utils import _update_parameter
 
 from _distribution import Distribution
 
-def _log(X):
-	if X is None:
-		return X
-	return torch.log(X)
 
 class Gamma(Distribution):
 	"""A gamma distribution object.
@@ -19,6 +15,12 @@ class Gamma(Distribution):
 	A gamma distribution is the sum of exponential distributions, and has shape
 	and rate parameters. This distribution assumes that each feature is
 	independent of the others. 
+
+	There are two ways to initialize this objecct. The first is to pass in
+	the tensor of rate and shae parameters, at which point they can immediately 
+	be used. The second is to not pass in the rate parameters and then call
+	either `fit` or `summary` + `from_summaries`, at which point the rate
+	and shape parameters will be learned from data.
 
 
 	Parameters
@@ -43,6 +45,12 @@ class Gamma(Distribution):
 	max_iter: int, [0, inf), optional
 		The maximum number of iterations to run EM when fitting the parameters
 		of the distribution. Default is 20.
+
+	frozen: bool, optional
+		Whether all the parameters associated with this distribution are frozen.
+		If you want to freeze individual pameters, or individual values in those
+		parameters, you must modify the `frozen` attribute of the tensor or
+		parameter directly. Default is False.
 
 
 	Examples
@@ -106,31 +114,24 @@ class Gamma(Distribution):
 	"""
 
 	def __init__(self, shapes=None, rates=None, inertia=0.0, tol=1e-4, 
-		max_iter=20):
+		max_iter=20, frozen=False):
 		super().__init__()
 		self.name = "Gamma"
 		self.inertia = inertia
 		self.tol = tol
 		self.max_iter = max_iter
+		self.frozen = frozen
 
-		self._shapes = _log(_cast_as_tensor(shapes))
-		self._rates = _log(_cast_as_tensor(rates))
+		self.shapes = _cast_as_tensor(shapes)
+		self.rates = _cast_as_tensor(rates)
 
 		self._initialized = shapes is not None
 		self.d = len(self.shapes) if self._initialized else None
 		self._reset_cache()
 
-	@property
-	def shapes(self):
-		return torch.exp(self._shapes)
-
-	@property
-	def rates(self):
-		return torch.exp(self._rates)
-
 	def _initialize(self, d):
-		self._shapes = torch.zeros(d)
-		self._rates = torch.zeros(d)
+		self.shapes = torch.zeros(d)
+		self.rates = torch.zeros(d)
 
 		self._initialized = True
 		super()._initialize(d)
@@ -153,6 +154,9 @@ class Gamma(Distribution):
 			self.rates * X, dim=-1)
 
 	def summarize(self, X, sample_weights=None):
+		if self.frozen == True:
+			return
+
 		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
 
 		self._w_sum += torch.sum(sample_weights, axis=(0, 1))
@@ -160,6 +164,9 @@ class Gamma(Distribution):
 		self._logx_w_sum += torch.sum(torch.log(X) * sample_weights, dim=0)
 
 	def from_summaries(self):
+		if self.frozen == True:
+			return
+
 		thetas = torch.log(self._xw_sum / self._w_sum) - \
 			self._logx_w_sum / self._w_sum
 
@@ -181,27 +188,10 @@ class Gamma(Distribution):
 		shapes = new_shapes
 		rates = 1.0 / (1.0 / (shapes * self._w_sum) * self._xw_sum)
 
-		_update_parameter(self._shapes, torch.log(shapes), self.inertia)
-		_update_parameter(self._rates, torch.log(rates), self.inertia)
+		_update_parameter(self.shapes, shapes, self.inertia)
+		_update_parameter(self.rates, rates, self.inertia)
 		self._reset_cache()
 
-
-class ToyNet(torch.nn.Module):
-	def __init__(self, d):
-		super(ToyNet, self).__init__()
-
-		self.fc1 = torch.nn.Linear(d, 32)
-		self.shapes = torch.nn.Linear(32, d)
-		self.rates = torch.nn.Linear(32, d)
-		self.relu = torch.nn.ReLU()
-
-	def forward(self, X):
-		X = self.fc1(X)
-		X = self.relu(X)
-		
-		shapes = self.shapes(X)
-		rates = self.rates(X)
-		return self.relu(shapes) + 0.01, self.relu(rates) + 0.01
 
 import numpy
 import time 
@@ -209,8 +199,8 @@ import time
 from pomegranate import IndependentComponentsDistribution
 from pomegranate import GammaDistribution
 
-d = 4500
-n = 10000
+d = 45
+n = 1000
 
 mu = numpy.random.randn(d) * 15
 X = numpy.exp(numpy.random.randn(n, d))
@@ -236,23 +226,3 @@ print("Gamma Distribution Fitting and Logp")
 print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
 print("torchegranate time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
 
-
-
-n = 10000
-d = 12
-
-X = torch.randn(n, d)
-X = torch.exp(X)
-
-model = ToyNet(d)
-optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-
-for i in range(10):
-	optimizer.zero_grad()
-	
-	shapes, rates = model(X)
-	loss = -Gamma(shapes, 2).log_probability(X).sum()
-
-	print(loss.item())
-	loss.backward()
-	optimizer.step()

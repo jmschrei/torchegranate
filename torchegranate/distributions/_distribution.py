@@ -15,6 +15,15 @@ class Distribution(torch.nn.Module):
 		super(Distribution, self).__init__()
 		self._initialized = False
 
+	def forward(self, X):
+		self.summarize(X)
+		return self.log_probability(X)
+
+	def backward(self, X):
+		self.from_summaries()
+		return X
+
+
 	def _initialize(self, d):
 		self.d = d
 		self._reset_cache()
