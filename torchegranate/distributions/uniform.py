@@ -3,6 +3,12 @@
 
 import torch
 
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
+
+from ._distribution import Distribution
+
+
 class Uniform():
 	def __init__(self, mins, maxs, frozen=False, inertia=0.0):
 		self.d = len(lows)

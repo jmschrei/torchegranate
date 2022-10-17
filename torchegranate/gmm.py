@@ -2,12 +2,12 @@
 # Author: Jacob Schreiber <jmschreiber91@gmail.com>
 
 import torch
-from BayesClassifier import BayesClassifier
+from .bayes_classifier import BayesClassifier
 
 
 class GeneralMixtureModel(BayesClassifier):
 	def __init__(self, distributions=None, priors=None, max_iters=10, threshold=0.1):
-		super(GeneralMixtureModel2, self).__init__(distributions=distributions,
+		super(GeneralMixtureModel, self).__init__(distributions=distributions,
 			priors=priors)
 		self.max_iters = max_iters
 		self.threshold = threshold

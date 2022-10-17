@@ -3,7 +3,7 @@
 
 import torch
 
-class BayesClassifier():
+class BayesClassifier(torch.nn.Module):
 	def __init__(self, distributions=None, priors=None, max_iters=10):
 		self.distributions = distributions
 		self.priors = torch.tensor(priors)

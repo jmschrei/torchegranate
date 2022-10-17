@@ -3,10 +3,11 @@
 
 import torch
 
-from _utils import _cast_as_tensor
-from _utils import _update_parameter
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
+from ._utils import _check_parameter
 
-from _distribution import Distribution
+from ._distribution import Distribution
 
 
 class Exponential(Distribution):
@@ -16,7 +17,7 @@ class Exponential(Distribution):
 	rate parameter describing the average time between event occurances.
 	This distribution assumes that each feature is independent of the others.
 
-	There are two ways to initialize this objecct. The first is to pass in
+	There are two ways to initialize this object. The first is to pass in
 	the tensor of rate parameters, at which point they can immediately be
 	used. The second is to not pass in the rate parameters and then call
 	either `fit` or `summary` + `from_summaries`, at which point the rate
@@ -104,10 +105,13 @@ class Exponential(Distribution):
 	def __init__(self, rates=None, inertia=0.0, frozen=False):
 		super().__init__()
 		self.name = "Exponential"
-		self.inertia = inertia
-		self.frozen = frozen
 
-		self.rates = _cast_as_tensor(rates)
+		self.rates = _check_parameter(_cast_as_tensor(rates), "rates", 
+			min_value=0, ndim=1)
+		self.inertia = _check_parameter(inertia, "inertia", min_value=0, 
+			max_value=1, ndim=0)
+		self.frozen = _check_parameter(frozen, "frozen", 
+			value_set=[True, False], ndim=0) 
 
 		self._initialized = rates is not None
 		self.d = len(self.rates) if self._initialized else None
@@ -129,7 +133,8 @@ class Exponential(Distribution):
 		self._log_rates = torch.log(self.rates)
 
 	def log_probability(self, X):
-		X = _cast_as_tensor(X)
+		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
+			ndim=2, shape=(-1, self.d))
 		return torch.sum(self._log_rates - self.rates * X, dim=1)
 
 	def summarize(self, X, sample_weights=None):
@@ -137,8 +142,9 @@ class Exponential(Distribution):
 			return
 
 		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weights, axis=(0, 1))
+		self._w_sum += torch.sum(sample_weights, dim=0)
 		self._xw_sum += torch.sum(X * sample_weights, dim=0)
 
 	def from_summaries(self):
@@ -148,38 +154,3 @@ class Exponential(Distribution):
 		rates = self._w_sum / self._xw_sum
 		_update_parameter(self.rates, rates, self.inertia)
 		self._reset_cache()
-
-
-import numpy
-import time 
-
-from pomegranate import MultivariateGaussianDistribution
-from pomegranate import IndependentComponentsDistribution
-from pomegranate import ExponentialDistribution
-
-d = 1500
-n = 10000
-
-mu = numpy.random.randn(d) * 15
-X = numpy.exp(numpy.random.randn(n, d))
-
-tic = time.time()
-d1 = IndependentComponentsDistribution.from_samples(X, distributions=ExponentialDistribution)
-logp1 = d1.log_probability(X)
-toc1 = time.time() - tic
-
-muz = torch.tensor([d.parameters[0] for d in d1.distributions])
-X = torch.tensor(X, dtype=torch.float32)
-
-tic = time.time()
-d2 = Exponential(mu)
-d2.summarize(X)
-d2.from_summaries()
-logp2 = d2.log_probability(X)
-toc2 = time.time() - tic
-
-print("Exponential Distribution Fitting and Logp")
-print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
-print("torchegranate time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
-
-print(numpy.abs(logp1 - logp2.numpy()).sum())

@@ -3,10 +3,11 @@
 
 import torch
 
-from _utils import _cast_as_tensor
-from _utils import _update_parameter
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
 
-from _distribution import Distribution
+from ._distribution import Distribution
+
 
 class Poisson(Distribution):
 	"""An poisson distribution object.
@@ -150,46 +151,3 @@ class Poisson(Distribution):
 		lambdas = self._xw_sum / self._w_sum
 		_update_parameter(self.lambdas, lambdas, self.inertia)
 		self._reset_cache()
-
-
-import numpy
-import time 
-
-from pomegranate import IndependentComponentsDistribution
-from pomegranate import PoissonDistribution
-
-d = 450
-n = 1000
-
-mu = numpy.random.randn(d) * 15
-X = numpy.exp(numpy.random.randn(n, d))
-
-tic = time.time()
-d1 = IndependentComponentsDistribution.from_samples(X, distributions=PoissonDistribution)
-logp1 = d1.log_probability(X)
-toc1 = time.time() - tic
-
-muz = torch.tensor([d.parameters[0] for d in d1.distributions])
-X = torch.tensor(X, dtype=torch.float32)
-
-tic = time.time()
-d2 = Poisson(muz)
-d2.summarize(X)
-d2.from_summaries()
-logp2 = d2.log_probability(X)
-toc2 = time.time() - tic
-
-print(toc1, logp1.sum())
-print(toc2, logp2.sum())
-print(numpy.abs(logp1 - logp2.numpy()).sum())
-
-torch.save(d2, "test.torch")
-
-d3 = torch.load("test.torch")
-
-tic = time.time()
-logp3 = d3.log_probability(X)
-toc3 = time.time() - tic
-
-print(toc3, logp3.sum())
-print(numpy.abs(logp1 - logp3.numpy()).sum())

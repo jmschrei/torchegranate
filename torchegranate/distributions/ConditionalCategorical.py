@@ -39,34 +39,3 @@ class ConditionalCategorical(torch.nn.Module):
 		self.probs = self._counts / self._counts.sum()
 
 		self._counts *= 0
-
-
-ds = 8, 6, 3, 5, 5, 6, 5, 2, 2, 3, 5
-d = len(ds)
-
-probs = torch.randn(*ds)
-probs = torch.abs(probs)
-probs /= probs.sum(dims=range(d-1), keepdims=True)
-
-n = 100000
-
-import time
-
-Xs = []
-for i in range(d):
-	X = torch.randint(ds[i], size=(n, 1))
-	Xs.append(X)
-
-X = torch.hstack(Xs)
-
-d = JointProbabilityTable(probs)
-
-tic = time.time()
-print(d.log_probability(X).sum())
-
-d.summarize(X)
-d.from_summaries()
-
-print(d.log_probability(X).sum())
-
-print(time.time() - tic)

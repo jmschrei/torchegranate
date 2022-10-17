@@ -3,10 +3,10 @@
 
 import torch
 
-from _utils import _cast_as_tensor
-from _utils import _update_parameter
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
 
-from _distribution import Distribution
+from ._distribution import Distribution
 
 
 class Gamma(Distribution):
@@ -191,38 +191,3 @@ class Gamma(Distribution):
 		_update_parameter(self.shapes, shapes, self.inertia)
 		_update_parameter(self.rates, rates, self.inertia)
 		self._reset_cache()
-
-
-import numpy
-import time 
-
-from pomegranate import IndependentComponentsDistribution
-from pomegranate import GammaDistribution
-
-d = 45
-n = 1000
-
-mu = numpy.random.randn(d) * 15
-X = numpy.exp(numpy.random.randn(n, d))
-
-tic = time.time()
-d1 = IndependentComponentsDistribution.from_samples(X, distributions=GammaDistribution)
-logp1 = d1.log_probability(X)
-toc1 = time.time() - tic
-
-muz = torch.tensor([d.parameters[0] for d in d1.distributions])
-X = torch.tensor(X, dtype=torch.float32)
-
-print(muz)
-
-tic = time.time()
-d2 = Gamma()
-d2.summarize(X)
-d2.from_summaries()
-logp2 = d2.log_probability(X)
-toc2 = time.time() - tic
-
-print("Gamma Distribution Fitting and Logp")
-print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
-print("torchegranate time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
-

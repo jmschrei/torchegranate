@@ -3,10 +3,11 @@
 
 import torch
 
-from _utils import _cast_as_tensor
-from _utils import _update_parameter
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
 
-from _distribution import Distribution
+from ._distribution import Distribution
+
 
 # Define some useful constants
 NEGINF = float("-inf")
@@ -128,45 +129,3 @@ class Normal(Distribution):
 		_update_parameter(self.means, means, self.inertia)
 		_update_parameter(self.covs, covs, self.inertia)
 		self._reset_cache()
-
-
-import numpy
-import time 
-
-from pomegranate import MultivariateGaussianDistribution
-from pomegranate import IndependentComponentsDistribution
-from pomegranate import NormalDistribution
-
-d = 10
-n = 1000
-
-z = 3.7784
-
-mu = numpy.random.randn(d) * 15
-cov = numpy.eye(d) * z #* numpy.abs(numpy.random.randn(d))
-
-
-X = numpy.random.randn(n, d)
-
-
-tic = time.time()
-d1 = IndependentComponentsDistribution.from_samples(X, distributions=NormalDistribution)
-logp1 = d1.log_probability(X)
-toc1 = time.time() - tic
-
-X = torch.tensor(X, dtype=torch.float32)
-mu = torch.tensor(mu, dtype=torch.float32)
-cov = torch.tensor(cov, dtype=torch.float32)
-
-tic = time.time()
-d2 = Normal(covariance_type='full')
-d2.summarize(X[:100])
-d2.summarize(X[100:5000])
-d2.summarize(X[5000:])
-d2.from_summaries()
-logp2 = d2.log_probability(X)
-toc2 = time.time() - tic
-
-print(toc1, logp1.sum())
-print(toc2, logp2.sum())
-print(numpy.abs(logp1 - logp2.numpy()).sum())

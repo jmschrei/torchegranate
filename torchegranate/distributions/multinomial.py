@@ -1,13 +1,12 @@
 # multinomial.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
-
 import torch
 
-from _utils import _cast_as_tensor
-from _utils import _update_parameter
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
 
-from _distribution import Distribution
+from ._distribution import Distribution
 
 
 class Multinomial(Distribution):
@@ -125,42 +124,3 @@ class Multinomial(Distribution):
 
 		_update_parameter(self.probabilities, probabilities, self.inertia)
 		self._reset_cache()
-
-
-import numpy
-import time 
-
-from pomegranate import MultivariateGaussianDistribution
-from pomegranate import IndependentComponentsDistribution
-from pomegranate import DiscreteDistribution
-
-d = 50
-n = 1000
-k = 20
-
-X = numpy.random.choice(k, size=(n, d))
-mu = numpy.abs(numpy.random.randn(k, d))
-mu = mu / mu.sum(axis=0, keepdims=True)
-
-tic = time.time()
-d1 = IndependentComponentsDistribution.from_samples(X, distributions=DiscreteDistribution)
-logp1 = d1.log_probability(X)
-toc1 = time.time() - tic
-
-X = torch.tensor(X, dtype=torch.int64)
-mu = torch.tensor(mu, dtype=torch.float32)
-
-
-tic = time.time()
-d2 = Multinomial(mu)
-d2.summarize(X)
-d2.from_summaries()
-logp2 = d2.log_probability(X)
-toc2 = time.time() - tic
-
-
-
-print("Categorical Distribution Fitting and Logp")
-print("pomegranate time: {:4.4}, pomegranate logp: {:4.4}".format(toc1, logp1.sum()))
-print("torchegranate time: {:4.4}, torchegranate logp: {:4.4}".format(toc2, logp2.sum()))
-print(numpy.abs(logp1 - logp2.numpy()).sum())
