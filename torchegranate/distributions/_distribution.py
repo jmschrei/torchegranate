@@ -42,11 +42,11 @@ class Distribution(torch.nn.Module):
 		self.from_summarize()
 
 	def summarize(self, X, sample_weights=None):
-		X = _cast_as_tensor(X)
-		sample_weights = _cast_as_tensor(sample_weights)
-
 		if not self._initialized:
 			self._initialize(len(X[0]))
+			
+		X = _cast_as_tensor(X)
+		sample_weights = _cast_as_tensor(sample_weights)
 
 		if sample_weights is None:
 			sample_weights = torch.ones(*X.shape)

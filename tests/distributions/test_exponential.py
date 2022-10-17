@@ -7,12 +7,37 @@ import pytest
 
 from torchegranate.distributions import Exponential
 
-from nose.tools import assert_almost_equal
-from nose.tools import assert_equal
 from nose.tools import assert_raises
-from nose.tools import with_setup
-from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
+
+@pytest.fixture
+def X():
+	return [[1, 2, 0],
+	     [0, 0, 1],
+	     [1, 1, 2],
+	     [2, 2, 2],
+	     [3, 1, 0],
+	     [5, 1, 4],
+	     [2, 1, 0]]
+
+
+@pytest.fixture
+def X2():
+	return [[1.2, 0.5, 1.1, 1.9],
+	     [6.2, 1.1, 2.4, 1.1]] 
+
+
+@pytest.fixture
+def w():
+	return [[1], [2], [0], [0], [5], [1], [2]]
+
+
+@pytest.fixture
+def w2():
+	return [[1.1], [3.5]]
+
+
+###
 
 
 def _test_initialization(d, x, inertia, frozen, dtype):
@@ -104,9 +129,73 @@ def test_initialization_raises():
 	assert_raises(ValueError, Exponential, frozen="true")
 
 
+def test_reset_cache(X):
+	d = Exponential()
+	d.summarize(X)
+	assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
+	assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
+
+	d._reset_cache()
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])	
+
+	d = Exponential()
+	assert_raises(AttributeError, getattr, d, "_w_sum")
+	assert_raises(AttributeError, getattr, d, "_xw_sum")
+	assert_raises(AttributeError, getattr, d, "_log_rates")
+
+	d._reset_cache()
+	assert_raises(AttributeError, getattr, d, "_w_sum")
+	assert_raises(AttributeError, getattr, d, "_xw_sum")
+	assert_raises(AttributeError, getattr, d, "_log_rates")
+
+
+def test_initialize(X):
+	d = Exponential()
+	assert d.d is None
+	assert d.rates is None
+	assert d._initialized == False
+	assert_raises(AttributeError, getattr, d, "_w_sum")
+	assert_raises(AttributeError, getattr, d, "_xw_sum")
+	assert_raises(AttributeError, getattr, d, "_log_rates")
+
+	d._initialize(3)
+	assert d._initialized == True
+	assert d.rates.shape[0] == 3
+	assert d.d == 3
+	assert_array_almost_equal(d.rates, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])	
+
+	d._initialize(2)
+	assert d._initialized == True
+	assert d.rates.shape[0] == 2
+	assert d.d == 2
+	assert_array_almost_equal(d.rates, [0.0, 0.0])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0])	
+
+	d = Exponential([1.2, 9.3])
+	assert d._initialized == True
+	assert d.d == 2
+
+	d._initialize(3)
+	assert d._initialized == True
+	assert d.rates.shape[0] == 3
+	assert d.d == 3
+	assert_array_almost_equal(d.rates, [0.0, 0.0, 0.0])
+
+	d = Exponential()
+	d.summarize(X)
+	d._initialize(4)
+	assert d._initialized == True
+	assert d.rates.shape[0] == 4
+	assert d.d == 4
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0, 0.0])	
+
 
 ###
-
 
 
 def _test_predictions(x, y, y_hat, dtype):
@@ -201,17 +290,31 @@ def test_log_probability():
 	_test_predictions(x, y, d1.log_probability(x), torch.float32)
 	_test_predictions(x, y, d2.log_probability(x), torch.float64)
 
+	p_torch = torch.tensor(numpy.array(p))
+	d3 = torch.distributions.Exponential(p_torch)
+	x_torch = torch.tensor(numpy.array(x))
+	_test_predictions(x, d3.log_prob(x_torch).sum(axis=1), 
+		d2.log_probability(x), torch.float64)
+
 	p = [1.7, 2.3, 0.1, 0.8, 4.1]
 	d1 = Exponential(p)
 	d2 = Exponential(numpy.array(p, dtype=numpy.float64))
+	d3 = torch.distributions.Exponential(p_torch)
 	x = [[1.0, 2.0, 8.0, 3.7, 1.9]]
 	y = [-17.601204]
 	_test_predictions(x, y, d1.log_probability(x), torch.float32)
 	_test_predictions(x, y, d2.log_probability(x), torch.float64)
 
+	p_torch = torch.tensor(numpy.array(p))
+	d3 = torch.distributions.Exponential(p_torch)
+	x_torch = torch.tensor(numpy.array(x))
+	_test_predictions(x, d3.log_prob(x_torch).sum(axis=1), 
+		d2.log_probability(x), torch.float64)
+
 	p = [1, 2, 4]
 	d1 = Exponential(p)
 	d2 = Exponential(numpy.array(p, dtype=numpy.float64))
+	d3 = torch.distributions.Exponential(p_torch)
 	x = [[1, 2, 1],
 	     [2, 2, 1],
 	     [0, 1, 0],
@@ -224,9 +327,9 @@ def test_log_probability():
 	p = [1.0, 2.0, 4.0]
 	d1 = Exponential(p)
 	d2 = Exponential(numpy.array(p, dtype=numpy.float64))
+	d3 = torch.distributions.Exponential(p_torch)
 	_test_predictions(x, y, d1.log_probability(x), torch.float32)
 	_test_predictions(x, y, d2.log_probability(x), torch.float64)
-
 
 def test_log_probability_dtypes():
 	X = numpy.random.uniform(0, 5, size=(10, 3)).astype(numpy.float32)
@@ -267,36 +370,7 @@ def test_log_probability_raises():
 	assert_raises(ValueError, d.log_probability, [[[1.1]]])
 
 
-
 ###
-
-
-
-@pytest.fixture
-def X():
-	return [[1, 2, 0],
-	     [0, 0, 1],
-	     [1, 1, 2],
-	     [2, 2, 2],
-	     [3, 1, 0],
-	     [5, 1, 4],
-	     [2, 1, 0]]
-
-
-@pytest.fixture
-def X2():
-	return [[1.2, 0.5, 1.1, 1.9],
-	     [6.2, 1.1, 2.4, 1.1]] 
-
-
-@pytest.fixture
-def w():
-	return [[1], [2], [0], [0], [5], [1], [2]]
-
-
-@pytest.fixture
-def w2():
-	return [[1.1], [3.5]]
 
 
 def test_summarize(X, X2):
