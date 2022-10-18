@@ -824,3 +824,174 @@ def test_from_summaries_dtypes(X):
 
 def test_from_summaries_raises():
 	assert_raises(AttributeError, Exponential().from_summaries)
+
+
+def test_fit(X):
+	d = Exponential([1.3, 2.3, 6.1])
+	d.fit(X[:4])
+	assert_array_almost_equal(d.rates, [1.0, 0.8, 0.8])
+	assert_array_almost_equal(d._log_rates, [0.0, -0.223144, -0.223144])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d.fit(X[4:])
+	assert_array_almost_equal(d.rates, [0.3, 1.0, 0.75])
+	assert_array_almost_equal(d._log_rates, [-1.203973,  0.0, -0.287682])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d = Exponential([1.3, 2.3, 6.1])
+	d.fit(X)
+	assert_array_almost_equal(d.rates, [0.5, 0.875, 0.777778])
+	assert_array_almost_equal(d._log_rates, [-0.693147, -0.133531, -0.251314])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+
+	d = Exponential()
+	d.fit(X[:4])
+	assert_array_almost_equal(d.rates, [1.0, 0.8, 0.8])
+	assert_array_almost_equal(d._log_rates, [0.0, -0.223144, -0.223144])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d.fit(X[4:])
+	assert_array_almost_equal(d.rates, [0.3, 1.0, 0.75])
+	assert_array_almost_equal(d._log_rates, [-1.203973,  0.0, -0.287682])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d = Exponential()
+	d.fit(X)
+	assert_array_almost_equal(d.rates, [0.5, 0.875, 0.777778])
+	assert_array_almost_equal(d._log_rates, [-0.693147, -0.133531, -0.251314])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+
+def test_fit_weighted(X, w):
+	d = Exponential([1.3, 2.3, 6.1])
+	d.fit(X[:4], sample_weights=w[:4])
+	assert_array_almost_equal(d.rates, [3.0, 1.5, 1.5])
+	assert_array_almost_equal(d._log_rates, [1.098612, 0.405465, 0.405465])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d.fit(X[4:], sample_weights=w[4:])
+	assert_array_almost_equal(d.rates, [0.333333, 1. , 2.])
+	assert_array_almost_equal(d._log_rates, [-1.098612, 0., 0.693147])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d = Exponential([1.3, 2.3, 6.1])
+	d.fit(X, sample_weights=w)
+	assert_array_almost_equal(d.rates, [0.44, 1.1, 1.833333])
+	assert_array_almost_equal(d._log_rates, [-0.820981,  0.09531, 0.606136])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+
+	d = Exponential()
+	d.fit(X[:4], sample_weights=w[:4])
+	assert_array_almost_equal(d.rates, [3.0, 1.5, 1.5])
+	assert_array_almost_equal(d._log_rates, [1.098612, 0.405465, 0.405465])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d.fit(X[4:], sample_weights=w[4:])
+	assert_array_almost_equal(d.rates, [0.333333, 1. , 2.])
+	assert_array_almost_equal(d._log_rates, [-1.098612, 0., 0.693147])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d = Exponential()
+	d.fit(X, sample_weights=w)
+	assert_array_almost_equal(d.rates, [0.44, 1.1, 1.833333])
+	assert_array_almost_equal(d._log_rates, [-0.820981,  0.09531, 0.606136])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	X = [[1.2, 0.5, 1.1, 1.9],
+	     [6.2, 1.1, 2.4, 1.1]] 
+
+	w = [[1.1], [3.5]]
+
+	d = Exponential()
+	d.fit(X, sample_weights=w)
+	assert_array_almost_equal(d.rates, [0.199826, 1.045455, 0.478668, 0.774411])
+	assert_array_almost_equal(d._log_rates, [-1.610307,  0.044452, -0.736748, 
+		-0.255653])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0, 0.0])
+
+
+def test_fit_chain(X):
+	d = Exponential().fit(X[:4])
+	assert_array_almost_equal(d.rates, [1.0, 0.8, 0.8])
+	assert_array_almost_equal(d._log_rates, [0.0, -0.223144, -0.223144])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d.fit(X[4:])
+	assert_array_almost_equal(d.rates, [0.3, 1.0, 0.75])
+	assert_array_almost_equal(d._log_rates, [-1.203973,  0.0, -0.287682])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+	d = Exponential().fit(X)
+	assert_array_almost_equal(d.rates, [0.5, 0.875, 0.777778])
+	assert_array_almost_equal(d._log_rates, [-0.693147, -0.133531, -0.251314])
+	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
+	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
+
+
+def test_fit_dtypes(X):
+	X = numpy.array(X)
+	X = X.astype(numpy.float32)
+
+	p = numpy.array([1.2, 4.1, 0.3], dtype=numpy.float32)
+	d = Exponential(p).fit(X)
+	assert d.rates.dtype == torch.float32
+	assert d._log_rates.dtype == torch.float32
+
+	p = numpy.array([1.2, 4.1, 0.3], dtype=numpy.float64)
+	d = Exponential(p).fit(X)
+	assert d.rates.dtype == torch.float64
+	assert d._log_rates.dtype == torch.float64
+
+	p = numpy.array([1, 4, 0], dtype=numpy.int32)
+	d = Exponential(p).fit(X)
+	assert d.rates.dtype == torch.int32
+	assert d._log_rates.dtype == torch.float32
+
+	X = numpy.array(X)
+	X = X.astype(numpy.float64)
+
+	p = numpy.array([1.2, 4.1, 0.3], dtype=numpy.float64)
+	d = Exponential(p).fit(X)
+	assert d.rates.dtype == torch.float64
+	assert d._log_rates.dtype == torch.float64
+
+
+def test_fit_raises(X, w):
+	d = Exponential([1.2, 1.8, 2.1])
+	assert_raises(ValueError, d.fit, [[1.1, 1.2, 1.9, 1.2]])
+	assert_raises(ValueError, d.fit, [[1.1]])
+	assert_raises(ValueError, d.fit, [1.1, 1.2, 1.9, 1.2])
+	assert_raises(ValueError, d.fit, [1.1])
+	assert_raises(ValueError, d.fit, [1.1, 1.2, 1.9])
+	assert_raises(ValueError, d.fit, [[[1.1]]])
+
+	d = Exponential([1.2])
+	assert_raises(ValueError, d.fit, [[1.1, 1.2, 1.9, 1.2]])
+	assert_raises(ValueError, d.fit, [[]])
+	assert_raises(ValueError, d.fit, [1.1, 1.2, 1.9, 1.2])
+	assert_raises(ValueError, d.fit, [1.1])
+	assert_raises(ValueError, d.fit, [[[1.1]]])
+
+	d = Exponential([1.2, 1.8, 2.1])
+	assert_raises(ValueError, d.fit, [X])
+	assert_raises(ValueError, d.fit, [X], w)
+	assert_raises(ValueError, d.fit, X, [w])
+	assert_raises(ValueError, d.fit, X, w[:3])
+	assert_raises(ValueError, d.fit, X[:3], w)

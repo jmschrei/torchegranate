@@ -16,6 +16,8 @@ class Exponential(Distribution):
 	An exponential distribution models rates of discrete events, and has a
 	rate parameter describing the average time between event occurances.
 	This distribution assumes that each feature is independent of the others.
+	Although the object is meant to operate on discrete counts, it can be used
+	on any non-negative continuous data.
 
 	There are two ways to initialize this object. The first is to pass in
 	the tensor of rate parameters, at which point they can immediately be
@@ -37,10 +39,10 @@ class Exponential(Distribution):
 		parameters are kept, equivalently to if the parameters were frozen.
 
 	frozen: bool, optional
-		Whether all the parameters associated with this distribution are frozen.
-		If you want to freeze individual pameters, or individual values in those
-		parameters, you must modify the `frozen` attribute of the tensor or
-		parameter directly. Default is False.
+		Whether all the parameters associated with this distribution are 
+		frozen. If you want to freeze individual pameters, or individual values 
+		in those parameters, you must modify the `frozen` attribute of the 
+		tensor or parameter directly. Default is False.
 
 
 	Examples
@@ -49,26 +51,34 @@ class Exponential(Distribution):
 	>>> rates = torch.tensor([1.2, 0.4])
 	>>> X = torch.tensor([[0.3, 0.2], [0.8, 0.1]])
 	>>>
-	>>> d = Gamma(rates)
+	>>> d = Exponential(rates)
 	>>> d.log_probability(X)
 	tensor([-1.1740, -1.7340])
 	>>>
 	>>>
 	>>> # Fit a distribution to data
-	>>> n, d = 100, 10
-	>>> X = torch.exp(torch.randn(d) * 15)
+	>>> torch.manual_seed(0)
+	>>>
+	>>> X = torch.exp(torch.randn(100, 10) * 15)
+	>>> X.shape
+	torch.Size([100, 10])
 	>>> 
-	>>> d = Gamma().fit(X)
+	>>> d = Exponential()
+	>>> d.fit(X)
+	>>> d.rates
+	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
+		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
 	>>>
 	>>>
 	>>> # Fit a distribution using the summarize API
-	>>> n, d = 100, 10
-	>>> X = torch.exp(torch.randn(d) * 15)
-	>>> 
-	>>> d = Gamma()
+	>>> d = Exponential()
 	>>> d.summarize(X[:50])
 	>>> d.summarize(X[50:])
 	>>> d.from_summaries()
+	>>> d.rates
+	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
+		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
+	>>> 
 	>>>
 	>>>
 	>>> # As a loss function for a neural network
@@ -76,28 +86,23 @@ class Exponential(Distribution):
 	>>> 	def __init__(self, d):
 	>>>			super(ToyNet, self).__init__()
 	>>>			self.fc1 = torch.nn.Linear(d, 32)
-	>>>			self.shapes = torch.nn.Linear(32, d)
 	>>>			self.rates = torch.nn.Linear(32, d)
 	>>>			self.relu = torch.nn.ReLU()
 	>>>
 	>>>		def forward(self, X):
 	>>>			X = self.fc1(X)
 	>>>			X = self.relu(X)
-	>>>			shapes = self.shapes(X)
 	>>>			rates = self.rates(X)
-	>>>			return self.relu(shapes) + 0.01, self.relu(rates) + 0.01
+	>>>			return self.relu(rates) + 0.01
 	>>>
-	>>> n, d = 1000
-	>>> X = torch.exp(torch.randn(n, d) * 15)
-	>>>
-	>>> model = ToyNet(d)
+	>>> model = ToyNet(10)
 	>>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 	>>>
 	>>> for i in range(100):
 	>>>		optimizer.zero_grad()
 	>>>
-	>>>		shapes, rates = model(X)
-	>>> 	loss = -Gamma(shapes, 2).log_probability(X).sum()
+	>>>		rates = model(X)
+	>>> 	loss = -Exponential(rates).log_probability(X).sum()
 	>>>		loss.backward()
 	>>>		optimizer.step()
 	"""

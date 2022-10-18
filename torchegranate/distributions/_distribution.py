@@ -39,12 +39,13 @@ class Distribution(torch.nn.Module):
 
 	def fit(self, X, sample_weights=None):
 		self.summarize(X, sample_weights=sample_weights)
-		self.from_summarize()
+		self.from_summaries()
+		return self
 
 	def summarize(self, X, sample_weights=None):
 		if not self._initialized:
 			self._initialize(len(X[0]))
-			
+
 		X = _cast_as_tensor(X)
 		sample_weights = _cast_as_tensor(sample_weights)
 
