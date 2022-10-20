@@ -140,6 +140,7 @@ class Exponential(Distribution):
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
 			ndim=2, shape=(-1, self.d))
+		
 		return torch.sum(self._log_rates - self.rates * X, dim=1)
 
 	def summarize(self, X, sample_weights=None):

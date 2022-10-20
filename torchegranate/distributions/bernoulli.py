@@ -3,7 +3,15 @@
 
 import torch
 
-class Bernoulli():
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
+from ._utils import _check_parameter
+from ._utils import eps
+
+from ._distribution import Distribution
+
+
+class Bernoulli(Distribution):
 	"""A Bernoulli distribution object.
 
 	A Bernoulli distribution models the probability of a binary variable
@@ -20,7 +28,7 @@ class Bernoulli():
 
 	Parameters
 	----------
-	probabilities: torch.tensor or None, shape=(d,), optional
+	probs: torch.tensor or None, shape=(d,), optional
 		The rate parameters for each feature. Default is None.
 
 	inertia: float, (0, 1), optional
@@ -37,38 +45,57 @@ class Bernoulli():
 		parameter directly. Default is False.
 	"""
 
-	def __init__(self, probabilities=None, inertia=0.0, frozen=False):
-		if probabilities is None:
-			self.log_probabilities = None
-			self.d = None
-			self._initialized = False
-		else:
-			self.log_probabilities = torch.log(probabilities)
-			self.d = probabilities.shape[0]
-			self._initialized = True
+	def __init__(self, probs=None, inertia=0.0, frozen=False):
+		super().__init__()
+		self.name = "Bernoulli"
 
-		self.frozen = frozen
-		self.inertia = inertia
+		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
+			min_value=eps, max_value=1-eps, ndim=1)
+		self.inertia = _check_parameter(inertia, "inertia", min_value=0, 
+			max_value=1, ndim=0)
+		self.frozen = _check_parameter(frozen, "frozen", 
+			value_set=[True, False], ndim=0) 
+
+		self._initialized = self.probs is not None
+		self.d = len(self.probs) if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
-		self.log_probabilities = torch.log(torch.ones(d) / k)
-		self.d = d
-		self._reset_cache()
+		self.probs = torch.zeros(d)
+
+		self._initialized = True
+		super()._initialize(d)
 
 	def _reset_cache(self):
-		self._inv_log_probabilities = torch.log(1. - torch.exp(self.log_probabilities))
-		self._counts = torch.zeros_like(self.log_probabilities)
-		self._total_counts = 0
+		if self._initialized == False:
+			return
+
+		self._w_sum = torch.zeros(self.d)
+		self._xw_sum = torch.zeros(self.d)
+
+		self._log_probs = torch.log(self.probs)
+		self._inv_log_probs = torch.log(1-self.probs)
 
 	def log_probability(self, X):
-		return X.matmul(self.log_probabilities) + (1-X).matmul(self._inv_log_probabilities)
+		X = _check_parameter(_cast_as_tensor(X, dtype=self.probs.dtype), "X", 
+			value_set=(0, 1), ndim=2, shape=(-1, self.d))
+
+		return X.matmul(self._log_probs) + (1-X).matmul(self._inv_log_probs)
 
 	def summarize(self, X, sample_weights=None):
-		self._total_counts += X.shape[0]
-		self._counts += torch.sum(X, dim=0)
+		if self.frozen == True:
+			return
+
+		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X = _check_parameter(X, "X", value_set=(0, 1))
+
+		self._w_sum += torch.sum(sample_weights, dim=0)
+		self._xw_sum += torch.sum(X * sample_weights, dim=0)
 
 	def from_summaries(self):
-		self.log_probabilities = torch.log(self._counts / self._total_counts)
-		self._inv_log_probabilities = torch.log(1. - self._counts / self._total_counts)
+		if self.frozen == True:
+			return
+
+		probs = self._xw_sum / self._w_sum
+		_update_parameter(self.probs, probs, self.inertia)
 		self._reset_cache()

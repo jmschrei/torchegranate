@@ -4,17 +4,29 @@
 import numpy
 import torch
 
-def _cast_as_tensor(value):
+
+eps = torch.finfo(torch.float32).eps
+
+
+def _cast_as_tensor(value, dtype=None):
 	"""Set the parameter.""" 
 
 	if value is None:
 		return None
 
 	if isinstance(value, (torch.nn.Parameter, torch.Tensor)):
-		return value
+		if dtype is None:
+			return value
+		elif value.dtype == dtype:
+			return value
+		else:
+			return value.type(dtype)
 
 	if isinstance(value, (float, int, list, tuple, numpy.ndarray)):
-		return torch.tensor(value)
+		if dtype is None:
+			return torch.tensor(value)
+		else:
+			return torch.tensor(value, dtype=dtype)
 
 
 def _update_parameter(value, new_value, inertia=0.0, frozen=None):

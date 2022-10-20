@@ -121,6 +121,7 @@ def test_initialization_float():
 def test_initialization_raises():
 	assert_raises(ValueError, Exponential, 1)
 	assert_raises(ValueError, Exponential, 1.2)
+	assert_raises(ValueError, Exponential, [1.0, -0.2, 2.1])
 	assert_raises(ValueError, Exponential, [0], inertia=-0.4)
 	assert_raises(ValueError, Exponential, [0.2], inertia=-0.4)
 	assert_raises(ValueError, Exponential, [0], inertia=1.2)
@@ -330,6 +331,7 @@ def test_log_probability():
 	d3 = torch.distributions.Exponential(p_torch)
 	_test_predictions(x, y, d1.log_probability(x), torch.float32)
 	_test_predictions(x, y, d2.log_probability(x), torch.float64)
+
 
 def test_log_probability_dtypes():
 	X = numpy.random.uniform(0, 5, size=(10, 3)).astype(numpy.float32)
