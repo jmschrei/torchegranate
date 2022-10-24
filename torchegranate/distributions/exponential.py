@@ -13,7 +13,7 @@ from ._distribution import Distribution
 class Exponential(Distribution):
 	"""An exponential distribution object.
 
-	An exponential distribution models rates of discrete events, and has a
+	An exponential distribution models scales of discrete events, and has a
 	rate parameter describing the average time between event occurances.
 	This distribution assumes that each feature is independent of the others.
 	Although the object is meant to operate on discrete counts, it can be used
@@ -28,7 +28,7 @@ class Exponential(Distribution):
 
 	Parameters
 	----------
-	rates: torch.tensor or None, shape=(d,), optional
+	scales: torch.tensor or None, shape=(d,), optional
 		The rate parameters for each feature. Default is None.
 
 	inertia: float, (0, 1), optional
@@ -48,10 +48,10 @@ class Exponential(Distribution):
 	Examples
 	--------
 	>>> # Create a distribution with known parameters
-	>>> rates = torch.tensor([1.2, 0.4])
+	>>> scales = torch.tensor([1.2, 0.4])
 	>>> X = torch.tensor([[0.3, 0.2], [0.8, 0.1]])
 	>>>
-	>>> d = Exponential(rates)
+	>>> d = Exponential(scales)
 	>>> d.log_probability(X)
 	tensor([-1.1740, -1.7340])
 	>>>
@@ -65,7 +65,7 @@ class Exponential(Distribution):
 	>>> 
 	>>> d = Exponential()
 	>>> d.fit(X)
-	>>> d.rates
+	>>> d.scales
 	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
 		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
 	>>>
@@ -75,7 +75,7 @@ class Exponential(Distribution):
 	>>> d.summarize(X[:50])
 	>>> d.summarize(X[50:])
 	>>> d.from_summaries()
-	>>> d.rates
+	>>> d.scales
 	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
 		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
 	>>> 
@@ -86,14 +86,14 @@ class Exponential(Distribution):
 	>>> 	def __init__(self, d):
 	>>>			super(ToyNet, self).__init__()
 	>>>			self.fc1 = torch.nn.Linear(d, 32)
-	>>>			self.rates = torch.nn.Linear(32, d)
+	>>>			self.scales = torch.nn.Linear(32, d)
 	>>>			self.relu = torch.nn.ReLU()
 	>>>
 	>>>		def forward(self, X):
 	>>>			X = self.fc1(X)
 	>>>			X = self.relu(X)
-	>>>			rates = self.rates(X)
-	>>>			return self.relu(rates) + 0.01
+	>>>			scales = self.scales(X)
+	>>>			return self.relu(scales) + 0.01
 	>>>
 	>>> model = ToyNet(10)
 	>>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -101,29 +101,25 @@ class Exponential(Distribution):
 	>>> for i in range(100):
 	>>>		optimizer.zero_grad()
 	>>>
-	>>>		rates = model(X)
-	>>> 	loss = -Exponential(rates).log_probability(X).sum()
+	>>>		scales = model(X)
+	>>> 	loss = -Exponential(scales).log_probability(X).sum()
 	>>>		loss.backward()
 	>>>		optimizer.step()
 	"""
 
-	def __init__(self, rates=None, inertia=0.0, frozen=False):
-		super().__init__()
+	def __init__(self, scales=None, inertia=0.0, frozen=False):
+		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Exponential"
 
-		self.rates = _check_parameter(_cast_as_tensor(rates), "rates", 
+		self.scales = _check_parameter(_cast_as_tensor(scales), "scales", 
 			min_value=0, ndim=1)
-		self.inertia = _check_parameter(inertia, "inertia", min_value=0, 
-			max_value=1, ndim=0)
-		self.frozen = _check_parameter(frozen, "frozen", 
-			value_set=[True, False], ndim=0) 
 
-		self._initialized = rates is not None
-		self.d = len(self.rates) if self._initialized else None
+		self._initialized = scales is not None
+		self.d = len(self.scales) if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
-		self.rates = torch.zeros(d)
+		self.scales = torch.zeros(d)
 
 		self._initialized = True
 		super()._initialize(d)
@@ -135,13 +131,13 @@ class Exponential(Distribution):
 		self._w_sum = torch.zeros(self.d)
 		self._xw_sum = torch.zeros(self.d)
 
-		self._log_rates = torch.log(self.rates)
+		self._log_scales = torch.log(self.scales)
 
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
 			ndim=2, shape=(-1, self.d))
 		
-		return torch.sum(self._log_rates - self.rates * X, dim=1)
+		return torch.sum(-self._log_scales - (1. / self.scales) * X, dim=1)
 
 	def summarize(self, X, sample_weights=None):
 		if self.frozen == True:
@@ -157,6 +153,6 @@ class Exponential(Distribution):
 		if self.frozen == True:
 			return
 
-		rates = self._w_sum / self._xw_sum
-		_update_parameter(self.rates, rates, self.inertia)
+		scales = self._xw_sum / self._w_sum
+		_update_parameter(self.scales, scales, self.inertia)
 		self._reset_cache()

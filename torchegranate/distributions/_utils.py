@@ -155,3 +155,20 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 						name, shape))
 
 	return parameter
+
+
+def _check_shapes(parameters, names):
+	n = len(parameters)
+
+	for i in range(n):
+		for j in range(n):
+			if parameters[i] is None:
+				continue
+
+			if parameters[j] is None:
+				continue
+
+			n1, n2 = names[i], names[j]
+			if len(parameters[i]) != len(parameters[j]):
+				raise ValueError("Parameters {} and {} must be the same "
+					"shape.".format(names[i], names[j]))

@@ -46,15 +46,11 @@ class Bernoulli(Distribution):
 	"""
 
 	def __init__(self, probs=None, inertia=0.0, frozen=False):
-		super().__init__()
+		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Bernoulli"
 
 		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
 			min_value=eps, max_value=1-eps, ndim=1)
-		self.inertia = _check_parameter(inertia, "inertia", min_value=0, 
-			max_value=1, ndim=0)
-		self.frozen = _check_parameter(frozen, "frozen", 
-			value_set=[True, False], ndim=0) 
 
 		self._initialized = self.probs is not None
 		self.d = len(self.probs) if self._initialized else None
@@ -74,13 +70,13 @@ class Bernoulli(Distribution):
 		self._xw_sum = torch.zeros(self.d)
 
 		self._log_probs = torch.log(self.probs)
-		self._inv_log_probs = torch.log(1-self.probs)
+		self._log_inv_probs = torch.log(1-self.probs)
 
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X, dtype=self.probs.dtype), "X", 
 			value_set=(0, 1), ndim=2, shape=(-1, self.d))
 
-		return X.matmul(self._log_probs) + (1-X).matmul(self._inv_log_probs)
+		return X.matmul(self._log_probs) + (1-X).matmul(self._log_inv_probs)
 
 	def summarize(self, X, sample_weights=None):
 		if self.frozen == True:

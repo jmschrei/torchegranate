@@ -30,48 +30,56 @@ def _test_cast(y, dtype, ndim):
 		assert_array_almost_equal(x, y)
 
 
-
 def test_cast_as_tensor_bool():
 	_test_cast(False, torch.bool, 0)
 	_test_cast(True, torch.bool, 0)
+
 
 def test_cast_as_tensor_int():
 	_test_cast(5, torch.int64, 0)
 	_test_cast(0, torch.int64, 0)
 	_test_cast(-1, torch.int64, 0)
 
+
 def test_cast_as_tensor_float():
 	_test_cast(1.2, torch.float32, 0)
 	_test_cast(0.0, torch.float32, 0)
 	_test_cast(-8.772, torch.float32, 0)
 
+
 def test_cast_as_tensor_numpy_bool():
 	_test_cast(numpy.array(False), torch.bool, 0)
 	_test_cast(numpy.array(True), torch.bool, 0)
+
 
 def test_cast_as_tensor_numpy_int():
 	_test_cast(numpy.array(5), torch.int64, 0)
 	_test_cast(numpy.array(0), torch.int64, 0)
 	_test_cast(numpy.array(-1), torch.int64, 0)
 
+
 def test_cast_as_tensor_numpy_float():
 	_test_cast(numpy.array(1.2), torch.float64, 0)
 	_test_cast(numpy.array(0.0), torch.float64, 0)
 	_test_cast(numpy.array(-8.772), torch.float64, 0)
 
+
 def test_cast_as_tensor_torch_bool():
 	_test_cast(torch.tensor(False), torch.bool, 0)
 	_test_cast(torch.tensor(True), torch.bool, 0)
+
 
 def test_cast_as_tensor_torch_int():
 	_test_cast(torch.tensor(5), torch.int64, 0)
 	_test_cast(torch.tensor(0), torch.int64, 0)
 	_test_cast(torch.tensor(-1), torch.int64, 0)
 
+
 def test_cast_as_tensor_torch_float():
 	_test_cast(torch.tensor(1.2), torch.float32, 0)
 	_test_cast(torch.tensor(0.0), torch.float32, 0)
 	_test_cast(torch.tensor(-8.772), torch.float32, 0)
+
 
 def test_cast_as_tensor_check_wrong():
 	assert_raises(AssertionError, _test_cast, True, torch.int64, 0)
@@ -88,6 +96,7 @@ def test_cast_as_tensor_numpy_bool_1d():
 	_test_cast(numpy.array([True, True, True]), torch.bool, 1)
 	_test_cast(numpy.array([False]), torch.bool, 1)
 
+
 def test_cast_as_tensor_numpy_int_1d():
 	_numpy_dtypes = numpy.int32, numpy.int64
 	_torch_dtypes = torch.int32, torch.int64
@@ -97,6 +106,7 @@ def test_cast_as_tensor_numpy_int_1d():
 		_test_cast(numpy.array([0, -3, 0], dtype=_dtype1), _dtype2, 1)
 		_test_cast(numpy.array([0], dtype=_dtype1), _dtype2, 1)
 
+
 def test_cast_as_tensor_numpy_float_1d():
 	_numpy_dtypes = numpy.float16, numpy.float32, numpy.float64
 	_torch_dtypes = torch.float16, torch.float32, torch.float64
@@ -105,6 +115,7 @@ def test_cast_as_tensor_numpy_float_1d():
 		_test_cast(numpy.array([1.2, 2.0, 3.1], dtype=_dtype1), _dtype2, 1)
 		_test_cast(numpy.array([0.0, -3.0, 0.0], dtype=_dtype1), _dtype2, 1)
 		_test_cast(numpy.array([0.0], dtype=_dtype1), _dtype2, 1)
+
 
 def test_cast_as_tensor_numpy_check_wrong_1d():
 	x1 = numpy.array([True, True, False])
@@ -126,6 +137,7 @@ def test_cast_as_tensor_numpy_bool_2d():
 	_test_cast(numpy.array([[True, True, True]]), torch.bool, 2)
 	_test_cast(numpy.array([[False]]), torch.bool, 2)
 
+
 def test_cast_as_tensor_numpy_int_2d():
 	_numpy_dtypes = numpy.int32, numpy.int64
 	_torch_dtypes = torch.int32, torch.int64
@@ -136,6 +148,7 @@ def test_cast_as_tensor_numpy_int_2d():
 		_test_cast(numpy.array([[0, -3, 0]], dtype=_dtype1), _dtype2, 2)
 		_test_cast(numpy.array([[0]], dtype=_dtype1), _dtype2, 2)
 
+
 def test_cast_as_tensor_numpy_float_2d():
 	_numpy_dtypes = numpy.float16, numpy.float32, numpy.float64
 	_torch_dtypes = torch.float16, torch.float32, torch.float64
@@ -145,6 +158,7 @@ def test_cast_as_tensor_numpy_float_2d():
 			dtype=_dtype1), _dtype2, 2)
 		_test_cast(numpy.array([[0.0, -3.0, 0.0]], dtype=_dtype1), _dtype2, 2)
 		_test_cast(numpy.array([[0.0]], dtype=_dtype1), _dtype2, 2)
+
 
 def test_cast_as_tensor_numpy_check_wrong_2d():
 	x1 = numpy.array([[True, True, False]])
@@ -165,6 +179,7 @@ def test_cast_as_tensor_torch_bool_1d():
 	_test_cast(torch.tensor([True, True, True]), torch.bool, 1)
 	_test_cast(torch.tensor([False]), torch.bool, 1)
 
+
 def test_cast_as_tensor_torch_int_1d():
 	_torch_dtypes = torch.int32, torch.int64
 
@@ -173,6 +188,7 @@ def test_cast_as_tensor_torch_int_1d():
 		_test_cast(torch.tensor([0, -3, 0], dtype=_dtype), _dtype, 1)
 		_test_cast(torch.tensor([0], dtype=_dtype), _dtype, 1)
 
+
 def test_cast_as_tensor_torch_float_1d():
 	_torch_dtypes = torch.float16, torch.float32, torch.float64
 
@@ -180,6 +196,7 @@ def test_cast_as_tensor_torch_float_1d():
 		_test_cast(torch.tensor([1.2, 2.0, 3.1], dtype=_dtype), _dtype, 1)
 		_test_cast(torch.tensor([0.0, -3.0, 0.0], dtype=_dtype), _dtype, 1)
 		_test_cast(torch.tensor([0.0], dtype=_dtype), _dtype, 1)
+
 
 def test_cast_as_tensor_torch_check_wrong_1d():
 	x1 = torch.tensor([True, True, False])
@@ -201,6 +218,7 @@ def test_cast_as_tensor_torch_bool_2d():
 	_test_cast(torch.tensor([[True, True, True]]), torch.bool, 2)
 	_test_cast(torch.tensor([[False]]), torch.bool, 2)
 
+
 def test_cast_as_tensor_torch_int_2d():
 	_torch_dtypes = torch.int32, torch.int64
 
@@ -210,6 +228,7 @@ def test_cast_as_tensor_torch_int_2d():
 		_test_cast(torch.tensor([[0, -3, 0]], dtype=_dtype), _dtype, 2)
 		_test_cast(torch.tensor([[0]], dtype=_dtype), _dtype, 2)
 
+
 def test_cast_as_tensor_torch_float_2d():
 	_torch_dtypes = torch.float16, torch.float32, torch.float64
 
@@ -218,6 +237,7 @@ def test_cast_as_tensor_torch_float_2d():
 			dtype=_dtype), _dtype, 2)
 		_test_cast(torch.tensor([[0.0, -3.0, 0.0]], dtype=_dtype), _dtype, 2)
 		_test_cast(torch.tensor([[0.0]], dtype=_dtype), _dtype, 2)
+
 
 def test_cast_as_tensor_torch_check_wrong_2d():
 	x1 = torch.tensor([[True, True, False]])
@@ -247,6 +267,7 @@ def _test_update(inertia):
 def test_update_parameter():
 	_test_update(inertia=0.0)
 
+
 def test_update_parameter_inertia():
 	_test_update(inertia=0.1)
 	_test_update(inertia=0.5)
@@ -268,6 +289,7 @@ def test_check_parameters_min_values_bool():
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=1)
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=1000.0)
 
+
 def test_check_parameters_min_values_int():
 	x = torch.tensor([1, 6, 24], dtype=torch.int32)
 	dtypes = [torch.bool]
@@ -277,6 +299,7 @@ def test_check_parameters_min_values_int():
 
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=2)
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=25.0)
+
 
 def test_check_parameters_min_values_float():
 	x = torch.tensor([1, 6, 24], dtype=torch.float32)
@@ -288,6 +311,7 @@ def test_check_parameters_min_values_float():
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=2)
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=25.0)
 
+
 def test_check_parameters_max_values_bool():
 	x = torch.tensor([True, True, False], dtype=torch.bool)
 	dtypes = [torch.bool]
@@ -297,6 +321,7 @@ def test_check_parameters_max_values_bool():
 
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=0)
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=-2.7)
+
 
 def test_check_parameters_max_values_int():
 	x = torch.tensor([1, 6, 24], dtype=torch.int32)
@@ -308,6 +333,7 @@ def test_check_parameters_max_values_int():
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=2)
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=8.0)
 
+
 def test_check_parameters_max_values_float():
 	x = torch.tensor([1, 6, 24], dtype=torch.float32)
 	dtypes = [torch.bool]
@@ -317,6 +343,7 @@ def test_check_parameters_max_values_float():
 
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=2)
 	assert_raises(ValueError, _check_parameter, x, "x", max_value=8.0)
+
 
 def test_check_parameters_minmax_values_float():
 	x = torch.tensor([1.1, 2.3, 7.8], dtype=torch.float32)
@@ -329,6 +356,7 @@ def test_check_parameters_minmax_values_float():
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=0.0,
 		max_value=6)
 
+
 def test_check_parameters_value_set_bool():
 	x = torch.tensor([True, True, True], dtype=torch.bool)
 	value_set = [True]
@@ -338,6 +366,7 @@ def test_check_parameters_value_set_bool():
 
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[False])
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[5.2])
+
 
 def test_check_parameters_value_set_int():
 	x = torch.tensor([2, 6, 24], dtype=torch.int32)
@@ -349,6 +378,7 @@ def test_check_parameters_value_set_int():
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[True, False])
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[5.2, 1, 6])
 
+
 def test_check_parameters_value_set_float():
 	x = torch.tensor([1.1, 6.0, 24.3], dtype=torch.float32)
 	value_set = [1.1, 6.0, 24.3, 17.8]
@@ -358,6 +388,7 @@ def test_check_parameters_value_set_float():
 
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[True, False])
 	assert_raises(ValueError, _check_parameter, x, "x", value_set=[5.2, 1, 6])
+
 
 def test_check_parameters_dtypes_bool():
 	x = torch.tensor([True, True, False], dtype=torch.bool)
@@ -370,6 +401,7 @@ def test_check_parameters_dtypes_bool():
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.int64])
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.float64])
 
+
 def test_check_parameters_dtypes_int():
 	x = torch.tensor([1, 2, 3], dtype=torch.int32)
 	dtypes = [torch.int32, torch.int64]
@@ -380,6 +412,7 @@ def test_check_parameters_dtypes_int():
 
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.int64])
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.float32])
+
 
 def test_check_parameters_dtypes_float():
 	x = torch.tensor([1, 2, 3], dtype=torch.float32)
@@ -392,12 +425,14 @@ def test_check_parameters_dtypes_float():
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.int64])
 	assert_raises(ValueError, _check_parameter, x, "x", dtypes=[torch.float64])
 
+
 def test_check_parameters_ndim_0():
 	x = torch.tensor(1.1)
 
 	_check_parameter(x, "x", ndim=0)
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=2)
+
 
 def test_check_parameters_ndim_1():
 	x = torch.tensor([1.1])
@@ -406,12 +441,14 @@ def test_check_parameters_ndim_1():
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=0)
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=2)
 
+
 def test_check_parameters_ndim_2():
 	x = torch.tensor([[1.1]])
 
 	_check_parameter(x, "x", ndim=2)
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=0)
+
 
 def test_check_parameters_shape():
 	x = torch.tensor([[1.1]])
@@ -441,3 +478,4 @@ def test_check_parameters_shape():
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(1, 2, 1))
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(1, 2, -1))
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(2, -1, -1))
+	

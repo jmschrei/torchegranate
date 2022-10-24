@@ -4,7 +4,7 @@ from .dirac_delta import DiracDelta
 from .exponential import Exponential
 from .gamma import Gamma
 from .JointCategorical import JointCategorical
-from .multinomial import Multinomial
+from .categorical import Categorical
 from .lognormal import LogNormal
 from .normal import Normal
 from .poisson import Poisson

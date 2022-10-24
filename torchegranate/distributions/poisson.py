@@ -5,6 +5,7 @@ import torch
 
 from ._utils import _cast_as_tensor
 from ._utils import _update_parameter
+from ._utils import _check_parameter
 
 from ._distribution import Distribution
 
@@ -103,13 +104,12 @@ class Poisson(Distribution):
 	"""
 
 
-	def __init__(self, lambdas, inertia=0.0, frozen=False):
-		super().__init__()
+	def __init__(self, lambdas=None, inertia=0.0, frozen=False):
+		super().__init__(inertia, frozen)
 		self.name = "Poisson"
-		self.inertia = inertia
-		self.frozen = frozen
 
-		self.lambdas = _cast_as_tensor(lambdas)
+		self.lambdas = _check_parameter(_cast_as_tensor(lambdas), "lambdas", 
+			min_value=0, ndim=1)
 
 		self._initialized = lambdas is not None
 		self.d = len(self.lambdas) if self._initialized else None
@@ -131,7 +131,9 @@ class Poisson(Distribution):
 		self._log_lambdas = torch.log(self.lambdas)
 
 	def log_probability(self, X):
-		X = _cast_as_tensor(X)
+		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
+			ndim=2, shape=(-1, self.d))
+		
 		return torch.sum(X * self._log_lambdas - self.lambdas - 
 			torch.lgamma(X+1), dim=-1)
 
@@ -140,8 +142,9 @@ class Poisson(Distribution):
 			return
 
 		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weights, axis=(0, 1))
+		self._w_sum += torch.sum(sample_weights, dim=0)
 		self._xw_sum += torch.sum(X * sample_weights, dim=0)
 
 	def from_summaries(self):

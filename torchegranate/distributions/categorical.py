@@ -1,15 +1,16 @@
-# multinomial.py
+# categorical.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
 import torch
 
 from ._utils import _cast_as_tensor
 from ._utils import _update_parameter
+from ._utils import _check_parameter
 
 from ._distribution import Distribution
 
 
-class Multinomial(Distribution):
+class Categorical(Distribution):
 	"""A multinomial distribution object.
 
 	This distribution represents a categorical distribution over features. The
@@ -69,58 +70,87 @@ class Multinomial(Distribution):
 
 	"""
 
-	def __init__(self, probabilities=None, inertia=0.0, frozen=False):
-		super().__init__()
+	def __init__(self, probs=None, inertia=0.0, frozen=False):
+		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Categorical"
-		self.inertia = inertia
-		self.frozen = frozen
 
-		self.probabilities = _cast_as_tensor(probabilities)
+		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
+			min_value=0, max_value=1, ndim=2)
 
-		self._initialized = probabilities is not None
-		self.d = self.probabilities.shape[1] if self._initialized else None
-		self.n_keys = self.probabilities.shape[0] if self._initialized else None
+		self._initialized = probs is not None
+		self.d = self.probs.shape[0] if self._initialized else None
+		self.n_keys = self.probs.shape[1] if self._initialized else None
 		self._reset_cache()
 
-	def _initialize(self, k, d):
-		self.probabilities = torch.zeros(d)
+	def _initialize(self, d, n_keys):
+		self.probs = torch.zeros(d, n_keys)
 
-		self.n_keys = k
+		self.n_keys = n_keys
 		self._initialized = True
 		super()._initialize(d)
-
 
 	def _reset_cache(self):
 		if self._initialized == False:
 			return
 
-		self._log_probabilities = torch.log(self.probabilities)
-		self._counts = torch.zeros(self.n_keys, d)
+		self._w_sum = torch.zeros(self.d)
+		self._xw_sum = torch.zeros(self.d, self.n_keys)
+
+		self._log_probs = torch.log(self.probs)
 
 	def log_probability(self, X):
-		X = _cast_as_tensor(X)
+		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0,
+			max_value=self.n_keys-1, ndim=2, shape=(-1, self.d))
 
-		logps = torch.zeros(X.shape[0])
+		logps = torch.zeros(X.shape[0], dtype=self.probs.dtype)
 		for i in range(self.d):
-			logps += self._log_probabilities[:, i][X[:, i]]
+			logps += self._log_probs[i][X[:, i]]
 
 		return logps
+
+	def _summarize(self, X, sample_weights):
+		X = _cast_as_tensor(X)
+		sample_weights = _cast_as_tensor(sample_weights)
+
+		if not self._initialized:
+			self._initialize(len(X[0]), int(X.max())+1)
+
+		if sample_weights is None:
+			sample_weights = torch.ones(*X.shape)
+		elif len(sample_weights.shape) == 1: 
+			sample_weights = sample_weights.reshape(-1, 1).expand(-1, 
+				X.shape[1])
+		elif sample_weights.shape[1] == 1:
+			sample_weights = sample_weights.expand(-1, X.shape[1])
+		elif sample_weights.shape[1] != X.shape[-1]:
+			raise ValueError("Variable sample_weight must have shape equal"
+				" to X or have the second dimension be 1.")
+
+		if X.shape[0] != sample_weights.shape[0]:
+			raise ValueError("Variables X and sample_weight must have an "
+				"equal number of elements in the first dimension.")
+
+		sample_weights = _check_parameter(sample_weights, "sample_weights", 
+			min_value=0, shape=(-1, self.d))
+
+		return X, sample_weights
 
 	def summarize(self, X, sample_weights=None):
 		if self.frozen == True:
 			return
 
-		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X, sample_weights = self._summarize(X, sample_weights=sample_weights)
+		X = _check_parameter(X, "X", min_value=0, max_value=self.n_keys-1)
 
+		self._w_sum += torch.sum(sample_weights, dim=0)
 		for i in range(self.n_keys):
-			self._counts[i] += (X == i).sum(axis=0)
+			self._xw_sum[:, i] += torch.sum((X == i) * sample_weights, dim=0)
 
 	def from_summaries(self):
 		if self.frozen == True:
 			return
 
-		probabilities = (self._counts / 
-			self._counts.sum(axis=0, keepdims=True))
+		probs = self._xw_sum / self._w_sum.unsqueeze(1)
 
-		_update_parameter(self.probabilities, probabilities, self.inertia)
+		_update_parameter(self.probs, probs, self.inertia)
 		self._reset_cache()

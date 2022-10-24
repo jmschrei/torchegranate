@@ -5,6 +5,8 @@ import torch
 
 from ._utils import _cast_as_tensor
 from ._utils import _update_parameter
+from ._utils import _check_parameter
+from ._utils import _check_shapes
 
 from ._distribution import Distribution
 
@@ -115,17 +117,21 @@ class Gamma(Distribution):
 
 	def __init__(self, shapes=None, rates=None, inertia=0.0, tol=1e-4, 
 		max_iter=20, frozen=False):
-		super().__init__()
+		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Gamma"
-		self.inertia = inertia
-		self.tol = tol
-		self.max_iter = max_iter
-		self.frozen = frozen
 
-		self.shapes = _cast_as_tensor(shapes)
-		self.rates = _cast_as_tensor(rates)
+		self.shapes = _check_parameter(_cast_as_tensor(shapes), "shapes", 
+			min_value=0, ndim=1)
+		self.rates = _check_parameter(_cast_as_tensor(rates), "rates", 
+			min_value=0, ndim=1)
 
-		self._initialized = shapes is not None
+		_check_shapes([self.shapes, self.rates], ["shapes", "rates"])
+
+		self.tol = _check_parameter(tol, "tol", min_value=0, ndim=0)
+		self.max_iter = _check_parameter(max_iter, "max_iter", min_value=1,
+			ndim=0)
+
+		self._initialized = (shapes is not None) and (rates is not None)
 		self.d = len(self.shapes) if self._initialized else None
 		self._reset_cache()
 
@@ -149,7 +155,9 @@ class Gamma(Distribution):
 		self._thetas = self._log_rates * self.shapes - self._lgamma_shapes
 
 	def log_probability(self, X):
-		X = _cast_as_tensor(X)
+		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
+			ndim=2, shape=(-1, self.d))
+
 		return torch.sum(self._thetas + torch.log(X) * (self.shapes - 1) - 
 			self.rates * X, dim=-1)
 
@@ -158,8 +166,9 @@ class Gamma(Distribution):
 			return
 
 		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weights, axis=(0, 1))
+		self._w_sum += torch.sum(sample_weights, dim=0)
 		self._xw_sum += torch.sum(X * sample_weights, dim=0)
 		self._logx_w_sum += torch.sum(torch.log(X) * sample_weights, dim=0)
 

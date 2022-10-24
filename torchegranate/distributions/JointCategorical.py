@@ -2,7 +2,7 @@
 
 import torch
 
-from .multinomial import Multinomial
+from .categorical import Categorical
 
 class JointCategorical(torch.nn.Module):
 	def __init__(self, probs=None, n_categories=None, pseudocount=0):
