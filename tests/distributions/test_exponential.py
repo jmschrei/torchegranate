@@ -7,11 +7,11 @@ import pytest
 
 from torchegranate.distributions import Exponential
 
-from _utils import _test_initialization_raises_one_parameter
-from _utils import _test_initialization
-from _utils import _test_predictions
-from _utils import _test_efd_from_summaries
-from _utils import _test_raises
+from ._utils import _test_initialization_raises_one_parameter
+from ._utils import _test_initialization
+from ._utils import _test_predictions
+from ._utils import _test_efd_from_summaries
+from ._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
@@ -242,7 +242,6 @@ def test_probability(X, scales):
 
 	d1 = Exponential(scales)
 	d2 = Exponential(numpy.array(scales, dtype=numpy.float64))
-	d3 = torch.distributions.Exponential(1. / p_torch)
 
 	_test_predictions(X, y, d1.probability(X), torch.float32)
 	_test_predictions(X, y, d2.probability(X), torch.float64)
@@ -423,27 +422,27 @@ def test_summarize(X, X2, scales):
 
 def test_summarize_weighted(X, X2, w, w2, scales):
 	d = Exponential(scales)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 2., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 	d = Exponential(scales)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 
 	d = Exponential()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 	d = Exponential([0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
@@ -452,43 +451,43 @@ def test_summarize_weighted_flat(X, X2, w, w2, scales):
 	w = numpy.array(w)[:,0] 
 
 	d = Exponential(scales)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 2., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 	d = Exponential(scales)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 
 	d = Exponential()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 	d = Exponential([0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 
 def test_summarize_weighted_2d(X):
 	d = Exponential()
-	d.summarize(X[:4], sample_weights=X[:4])
+	d.summarize(X[:4], sample_weight=X[:4])
 	assert_array_almost_equal(d._w_sum, [4., 5., 5.])
 	assert_array_almost_equal(d._xw_sum, [6., 9., 9.])
 
-	d.summarize(X[4:], sample_weights=X[4:])
+	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [14., 8., 9.])
 	assert_array_almost_equal(d._xw_sum, [44., 12., 25.])
 
 	d = Exponential()
-	d.summarize(X, sample_weights=X)
+	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [14., 8., 9.])
 	assert_array_almost_equal(d._xw_sum, [44., 12., 25.])
 
@@ -570,18 +569,18 @@ def test_from_summaries(X, scales):
 def test_from_summaries_weighted(X, w, scales):
 	for param in scales, None:
 		d = Exponential(scales)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[0.333333, 0.666667, 0.666667])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[3. , 1. , 0.5])
 
 		d = Exponential(scales)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		d.from_summaries()
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[2.272727, 0.909091, 0.545455])
@@ -625,7 +624,7 @@ def test_from_summaries_inertia(X, w, scales):
 
 def test_from_summaries_weighted_inertia(X, w, scales):
 	d = Exponential(scales, inertia=0.3)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	d.from_summaries()
 	_test_efd_from_summaries(d, "scales", "_log_scales", 
 		[1.950909, 1.176364, 1.011818])
@@ -670,7 +669,7 @@ def test_from_summaries_frozen(X, w, scales):
 	_test_efd_from_summaries(d, "scales", "_log_scales", scales)
 
 	d = Exponential(scales, frozen=True)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
 	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
 
@@ -738,16 +737,16 @@ def test_fit(X, scales):
 def test_fit_weighted(X, w, scales):
 	for param in scales, None:
 		d = Exponential(param)
-		d.fit(X[:4], sample_weights=w[:4])
+		d.fit(X[:4], sample_weight=w[:4])
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[0.333333, 0.666667, 0.666667])
 
-		d.fit(X[4:], sample_weights=w[4:])
+		d.fit(X[4:], sample_weight=w[4:])
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[3., 1. , 0.5])
 
 		d = Exponential(param)
-		d.fit(X, sample_weights=w)
+		d.fit(X, sample_weight=w)
 		_test_efd_from_summaries(d, "scales", "_log_scales", 
 			[2.272727, 0.909091, 0.545455])
 
@@ -758,7 +757,7 @@ def test_fit_weighted(X, w, scales):
 	w = [[1.1], [3.5]]
 
 	d = Exponential()
-	d.fit(X, sample_weights=w)
+	d.fit(X, sample_weight=w)
 	_test_efd_from_summaries(d, "scales", "_log_scales", 
 		[5.004348, 0.956522, 2.089131, 1.291304])
 

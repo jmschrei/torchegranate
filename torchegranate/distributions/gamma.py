@@ -3,10 +3,10 @@
 
 import torch
 
-from ._utils import _cast_as_tensor
-from ._utils import _update_parameter
-from ._utils import _check_parameter
-from ._utils import _check_shapes
+from .._utils import _cast_as_tensor
+from .._utils import _update_parameter
+from .._utils import _check_parameter
+from .._utils import _check_shapes
 
 from ._distribution import Distribution
 
@@ -161,16 +161,16 @@ class Gamma(Distribution):
 		return torch.sum(self._thetas + torch.log(X) * (self.shapes - 1) - 
 			self.rates * X, dim=-1)
 
-	def summarize(self, X, sample_weights=None):
+	def summarize(self, X, sample_weight=None):
 		if self.frozen == True:
 			return
 
-		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weights, dim=0)
-		self._xw_sum += torch.sum(X * sample_weights, dim=0)
-		self._logx_w_sum += torch.sum(torch.log(X) * sample_weights, dim=0)
+		self._w_sum += torch.sum(sample_weight, dim=0)
+		self._xw_sum += torch.sum(X * sample_weight, dim=0)
+		self._logx_w_sum += torch.sum(torch.log(X) * sample_weight, dim=0)
 
 	def from_summaries(self):
 		if self.frozen == True:

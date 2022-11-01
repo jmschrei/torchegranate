@@ -3,9 +3,10 @@
 
 import torch
 
-from ._utils import _cast_as_tensor
-from ._utils import _update_parameter
-from ._utils import _check_parameter
+from .._utils import _cast_as_tensor
+from .._utils import _update_parameter
+from .._utils import _check_parameter
+from .._utils import _reshape_weights
 
 
 class Distribution(torch.nn.Module):
@@ -45,37 +46,21 @@ class Distribution(torch.nn.Module):
 	def log_probability(self, X):
 		raise NotImplementedError
 
-	def fit(self, X, sample_weights=None):
-		self.summarize(X, sample_weights=sample_weights)
+	def fit(self, X, sample_weight=None):
+		self.summarize(X, sample_weight=sample_weight)
 		self.from_summaries()
 		return self
 
-	def summarize(self, X, sample_weights=None):
+	def summarize(self, X, sample_weight=None):
 		if not self._initialized:
 			self._initialize(len(X[0]))
 
 		X = _cast_as_tensor(X)
-		sample_weights = _cast_as_tensor(sample_weights)
+		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 
-		if sample_weights is None:
-			sample_weights = torch.ones(*X.shape)
-		elif len(sample_weights.shape) == 1: 
-			sample_weights = sample_weights.reshape(-1, 1).expand(-1, 
-				X.shape[1])
-		elif sample_weights.shape[1] == 1:
-			sample_weights = sample_weights.expand(-1, X.shape[1])
-		elif sample_weights.shape[1] != X.shape[-1]:
-			raise ValueError("Variable sample_weight must have shape equal"
-				" to X or have the second dimension be 1.")
-
-		if X.shape[0] != sample_weights.shape[0]:
-			raise ValueError("Variables X and sample_weight must have an "
-				"equal number of elements in the first dimension.")
-
-		sample_weights = _check_parameter(sample_weights, "sample_weights", 
-			min_value=0, shape=(-1, self.d))
-
-		return X, sample_weights
+		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
+			dtype=torch.float32))
+		return X, sample_weight
 
 	def from_summaries(self):
 		raise NotImplementedError

@@ -14,7 +14,7 @@ def _test_initialization(d, x, name, inertia, frozen, dtype):
 	param = getattr(d, name)
 
 	if x is not None:
-		assert param.shape == (len(x),)
+		assert param.shape[0] == len(x)
 		assert param.dtype == dtype
 		assert_array_almost_equal(param, x)
 	else:
@@ -98,14 +98,23 @@ def _test_raises(d, name, X, w=None, min_value=None, max_value=None):
 
 	assert_raises(ValueError, f, [X])
 	assert_raises(ValueError, f, X[0])
-	assert_raises(ValueError, f, [x[:-1] for x in X])
 	assert_raises((ValueError, TypeError), f, X[0][0])
 
-	if min_value is not None:
-		assert_raises(ValueError, f, [[min_value-0.1 for i in range(d.d)]])
-	
-	if max_value is not None:
-		assert_raises(ValueError, f, [[max_value+0.1 for i in range(d.d)]])	
+	if d._initialized == True:
+		assert_raises(ValueError, f, [x[:-1] for x in X])
+
+		if min_value is not None:
+			assert_raises(ValueError, f, [[min_value-0.1 for i in range(d.d)]])
+		
+		if max_value is not None:
+			assert_raises(ValueError, f, [[max_value+0.1 for i in range(d.d)]])
+	else:	
+		if min_value is not None:
+			assert_raises(ValueError, f, [[min_value-0.1 for i in range(3)]])
+		
+		if max_value is not None:
+			assert_raises(ValueError, f, [[max_value+0.1 for i in range(3)]])
+
 
 	if w is not None:
 		assert_raises(ValueError, f, [X], w)

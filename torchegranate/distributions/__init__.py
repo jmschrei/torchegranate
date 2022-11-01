@@ -9,4 +9,3 @@ from .lognormal import LogNormal
 from .normal import Normal
 from .poisson import Poisson
 from .uniform import Uniform
-from .zero_inflated import ZeroInflated

@@ -7,11 +7,11 @@ import pytest
 
 from torchegranate.distributions import Bernoulli
 
-from _utils import _test_initialization_raises_one_parameter
-from _utils import _test_initialization
-from _utils import _test_predictions
-from _utils import _test_efd_from_summaries
-from _utils import _test_raises
+from ._utils import _test_initialization_raises_one_parameter
+from ._utils import _test_initialization
+from ._utils import _test_predictions
+from ._utils import _test_efd_from_summaries
+from ._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
@@ -336,27 +336,27 @@ def test_summarize(X, X2, probs):
 
 def test_summarize_weighted(X, X2, w, w2, probs):
 	d = Bernoulli(probs)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 0., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [9.0, 8.0, 4.0])
 
 	d = Bernoulli(probs)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [9.0, 8.0, 4.0])
 
 
 	d = Bernoulli()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [4.6, 3.5, 1.1, 4.6])
 
 	d = Bernoulli([0.1, 0.1, 0.1, 0.1])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [4.6, 3.5, 1.1, 4.6])
 
@@ -365,43 +365,43 @@ def test_summarize_weighted_flat(X, X2, w, w2, probs):
 	w = numpy.array(w)[:,0] 
 
 	d = Bernoulli(probs)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 0., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [9.0, 8.0, 4.0])
 
 	d = Bernoulli(probs)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [9.0, 8.0, 4.0])
 
 
 	d = Bernoulli()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [4.6, 3.5, 1.1, 4.6])
 
 	d = Bernoulli([0.1, 0.1, 0.1, 0.1])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [4.6, 3.5, 1.1, 4.6])
 
 
 def test_summarize_weighted_2d(X):
 	d = Bernoulli()
-	d.summarize(X[:4], sample_weights=X[:4])
+	d.summarize(X[:4], sample_weight=X[:4])
 	assert_array_almost_equal(d._w_sum, [2., 1., 3.])
 	assert_array_almost_equal(d._xw_sum, [2., 1., 3.])
 
-	d.summarize(X[4:], sample_weights=X[4:])
+	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [5., 4., 4.])
 	assert_array_almost_equal(d._xw_sum, [5., 4., 4.])
 
 	d = Bernoulli()
-	d.summarize(X, sample_weights=X)
+	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [5., 4., 4.])
 	assert_array_almost_equal(d._xw_sum, [5., 4., 4.])
 
@@ -483,18 +483,18 @@ def test_from_summaries(X, probs):
 def test_from_summaries_weighted(X, w, probs):
 	for param in probs, None:
 		d = Bernoulli(probs)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[0.333333, 0.      , 0.666667])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[1.  , 1.  , 0.25])
 
 		d = Bernoulli(probs)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		d.from_summaries()
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[0.818182, 0.727273, 0.363636])
@@ -538,7 +538,7 @@ def test_from_summaries_inertia(X, w, probs):
 
 def test_from_summaries_weighted_inertia(X, w, probs):
 	d = Bernoulli(probs, inertia=0.3)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	d.from_summaries()
 	_test_efd_from_summaries(d, "probs", "_log_probs", 
 		[0.602727, 0.770091, 0.365545])
@@ -583,7 +583,7 @@ def test_from_summaries_frozen(X, w, probs):
 	_test_efd_from_summaries(d, "probs", "_log_probs", probs)
 
 	d = Bernoulli(probs, frozen=True)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
 	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
 
@@ -634,21 +634,21 @@ def test_fit(X, probs):
 def test_fit_weighted(X, w, probs):
 	for param in probs, None:
 		d = Bernoulli(param)
-		d.fit(X[:4], sample_weights=w[:4])
+		d.fit(X[:4], sample_weight=w[:4])
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[0.333333, 0.      , 0.666667])
 
-		d.fit(X[4:], sample_weights=w[4:])
+		d.fit(X[4:], sample_weight=w[4:])
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[1.  , 1.  , 0.25])
 
 		d = Bernoulli(param)
-		d.fit(X, sample_weights=w)
+		d.fit(X, sample_weight=w)
 		_test_efd_from_summaries(d, "probs", "_log_probs", 
 			[0.818182, 0.727273, 0.363636])
 
 	d = Bernoulli()
-	d.fit(X, sample_weights=w)
+	d.fit(X, sample_weight=w)
 	_test_efd_from_summaries(d, "probs", "_log_probs", 
 		[0.818182, 0.727273, 0.363636])
 

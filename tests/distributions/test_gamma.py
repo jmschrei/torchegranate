@@ -7,11 +7,11 @@ import pytest
 
 from torchegranate.distributions import Gamma
 
-from _utils import _test_initialization_raises_two_parameters
-from _utils import _test_initialization
-from _utils import _test_predictions
-from _utils import _test_efd_from_summaries
-from _utils import _test_raises
+from ._utils import _test_initialization_raises_two_parameters
+from ._utils import _test_initialization
+from ._utils import _test_predictions
+from ._utils import _test_efd_from_summaries
+from ._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
@@ -541,31 +541,31 @@ def test_summarize(X, shapes, rates):
 
 def test_summarize_weighted(X, X2, w, w2, shapes, rates):
 	d = Gamma(shapes, rates)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [2.1, 2.5, 3.1])
 	assert_array_almost_equal(d._logx_w_sum, [-1.290984, -2.476939, -0.168419])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [28.9     , 12.      ,  8.799999])
 	assert_array_almost_equal(d._logx_w_sum, [8.091207, -1.310356, -9.407159])
 
 	d = Gamma(shapes, rates)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [28.9     , 12.      ,  8.799999])
 	assert_array_almost_equal(d._logx_w_sum, [8.091207, -1.310356, -9.407158])
 
 	d = Gamma()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 	assert_array_almost_equal(d._logx_w_sum, [6.586476, -0.428876,  3.168982,  
 		1.039625])
 
 	d = Gamma([0, 0, 0, 0], [0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 	assert_array_almost_equal(d._logx_w_sum, [6.586476, -0.428876,  3.168982,  
@@ -576,31 +576,31 @@ def test_summarize_weighted_flat(X, X2, w, w2, shapes, rates):
 	w = numpy.array(w)[:,0] 
 
 	d = Gamma(shapes, rates)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [2.1, 2.5, 3.1])
 	assert_array_almost_equal(d._logx_w_sum, [-1.290984, -2.476939, -0.168419])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [28.9     , 12.      ,  8.799999])
 	assert_array_almost_equal(d._logx_w_sum, [8.091207, -1.310356, -9.407159])
 
 	d = Gamma(shapes, rates)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [28.9     , 12.      ,  8.799999])
 	assert_array_almost_equal(d._logx_w_sum, [8.091207, -1.310356, -9.407158])
 
 	d = Gamma()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 	assert_array_almost_equal(d._logx_w_sum, [6.586476, -0.428876,  3.168982,  
 		1.039625])
 
 	d = Gamma([0, 0, 0, 0], [0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 	assert_array_almost_equal(d._logx_w_sum, [6.586476, -0.428876,  3.168982,  
@@ -609,18 +609,18 @@ def test_summarize_weighted_flat(X, X2, w, w2, shapes, rates):
 
 def test_summarize_weighted_2d(X):
 	d = Gamma()
-	d.summarize(X[:4], sample_weights=X[:4])
+	d.summarize(X[:4], sample_weight=X[:4])
 	assert_array_almost_equal(d._w_sum, [6.1, 5.5, 6.2])
 	assert_array_almost_equal(d._xw_sum, [13.03    , 10.069999, 11.62])
 	assert_array_almost_equal(d._logx_w_sum, [3.736675, 2.89909 , 3.463712])
 
-	d.summarize(X[4:], sample_weights=X[4:])
+	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [17.1,  9.7, 10.6])
 	assert_array_almost_equal(d._xw_sum, [58.59    , 16.369999, 27.720001])
 	assert_array_almost_equal(d._logx_w_sum, [18.738672,  4.459686,  8.417439])
 
 	d = Gamma()
-	d.summarize(X, sample_weights=X)
+	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [17.099998,  9.7     , 10.599999])
 	assert_array_almost_equal(d._xw_sum, [58.59    , 16.369999, 27.720001])
 	assert_array_almost_equal(d._logx_w_sum, [18.73867 ,  4.459686,  8.417439])
@@ -718,18 +718,18 @@ def test_from_summaries(X, shapes, rates):
 def test_from_summaries_weighted(X, w, shapes, rates):
 	for param in shapes, None:
 		d = Gamma(shapes, rates)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		d.from_summaries()
 		_test_fit_params(d, [6.951008, 0.907765, 5.783966],
 			[9.930012, 1.089317, 5.597386], [9.468783, 0.017088, 5.538523])
 	
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		d.from_summaries()
 		_test_fit_params(d, [13.98193 , 19.375662,  0.73567],
 			[4.17371 , 16.316347,  1.032519], [-2.527685, 16.604717, -0.195563])
 
 		d = Gamma(shapes, rates)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		d.from_summaries()
 		_test_fit_params(d, [2.323329, 2.580077, 0.922164],
 			[0.884312, 2.365071, 1.152706], [-0.453977,  1.878409,  0.08094])
@@ -779,7 +779,7 @@ def test_from_summaries_inertia(X, w, shapes, rates):
 
 def test_from_summaries_weighted_inertia(X, w, shapes, rates):
 	d = Gamma(shapes, rates, inertia=0.3)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	d.from_summaries()
 	_test_fit_params(d, [1.98633 , 2.346054, 1.275515],
 		[0.709018, 2.58555 , 1.166894], [-0.677328,  2.046211,  0.300559])
@@ -824,7 +824,7 @@ def test_from_summaries_frozen(X, w, shapes, rates):
 	_test_fit_params(d, shapes, rates, [-1.359393,  2.107607,  0.337438])
 
 	d = Gamma(shapes, rates, frozen=True)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
 	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
 
@@ -906,16 +906,16 @@ def test_fit(X, shapes, rates):
 def test_fit_weighted(X, w, shapes, rates):
 	for param in shapes, None:
 		d = Gamma(shapes, rates)
-		d.fit(X[:4], sample_weights=w[:4])
+		d.fit(X[:4], sample_weight=w[:4])
 		_test_fit_params(d, [6.951008, 0.907765, 5.783966],
 			[9.930012, 1.089317, 5.597386], [9.468783, 0.017088, 5.538523])
 	
-		d.fit(X[4:], sample_weights=w[4:])
+		d.fit(X[4:], sample_weight=w[4:])
 		_test_fit_params(d, [13.98193 , 19.375662,  0.73567],
 			[4.17371 , 16.316347,  1.032519], [-2.527685, 16.604717, -0.195563])
 
 		d = Gamma(shapes, rates)
-		d.fit(X, sample_weights=w)
+		d.fit(X, sample_weight=w)
 		_test_fit_params(d, [2.323329, 2.580077, 0.922164],
 			[0.884312, 2.365071, 1.152706], [-0.453977,  1.878409,  0.08094])
 	
@@ -925,7 +925,7 @@ def test_fit_weighted(X, w, shapes, rates):
 	w = [[1.1], [3.5]]
 
 	d = Gamma()
-	d.fit(X, sample_weights=w)
+	d.fit(X, sample_weight=w)
 	_test_fit_params(d, [2.957831, 10.413525, 10.615726, 17.029907],
 		[0.591052, 10.886867,  5.081409, 13.188144], 
 		[-2.209965, 11.121039,  3.048994, 13.169821])

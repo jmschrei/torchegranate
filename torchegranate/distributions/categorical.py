@@ -3,9 +3,10 @@
 
 import torch
 
-from ._utils import _cast_as_tensor
-from ._utils import _update_parameter
-from ._utils import _check_parameter
+from .._utils import _cast_as_tensor
+from .._utils import _update_parameter
+from .._utils import _check_parameter
+from .._utils import _reshape_weights
 
 from ._distribution import Distribution
 
@@ -108,43 +109,28 @@ class Categorical(Distribution):
 
 		return logps
 
-	def _summarize(self, X, sample_weights):
+	def _summarize(self, X, sample_weight):
 		X = _cast_as_tensor(X)
-		sample_weights = _cast_as_tensor(sample_weights)
-
+		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight))
+		
 		if not self._initialized:
 			self._initialize(len(X[0]), int(X.max())+1)
 
-		if sample_weights is None:
-			sample_weights = torch.ones(*X.shape)
-		elif len(sample_weights.shape) == 1: 
-			sample_weights = sample_weights.reshape(-1, 1).expand(-1, 
-				X.shape[1])
-		elif sample_weights.shape[1] == 1:
-			sample_weights = sample_weights.expand(-1, X.shape[1])
-		elif sample_weights.shape[1] != X.shape[-1]:
-			raise ValueError("Variable sample_weight must have shape equal"
-				" to X or have the second dimension be 1.")
+		_check_parameter(sample_weight, "sample_weight", min_value=0, 
+			shape=(-1, self.d))
 
-		if X.shape[0] != sample_weights.shape[0]:
-			raise ValueError("Variables X and sample_weight must have an "
-				"equal number of elements in the first dimension.")
+		return X, sample_weight
 
-		sample_weights = _check_parameter(sample_weights, "sample_weights", 
-			min_value=0, shape=(-1, self.d))
-
-		return X, sample_weights
-
-	def summarize(self, X, sample_weights=None):
+	def summarize(self, X, sample_weight=None):
 		if self.frozen == True:
 			return
 
-		X, sample_weights = self._summarize(X, sample_weights=sample_weights)
+		X, sample_weight = self._summarize(X, sample_weight=sample_weight)
 		X = _check_parameter(X, "X", min_value=0, max_value=self.n_keys-1)
 
-		self._w_sum += torch.sum(sample_weights, dim=0)
+		self._w_sum += torch.sum(sample_weight, dim=0)
 		for i in range(self.n_keys):
-			self._xw_sum[:, i] += torch.sum((X == i) * sample_weights, dim=0)
+			self._xw_sum[:, i] += torch.sum((X == i) * sample_weight, dim=0)
 
 	def from_summaries(self):
 		if self.frozen == True:

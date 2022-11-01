@@ -4,9 +4,9 @@
 import numpy
 import torch
 
-from torchegranate.distributions._utils import _cast_as_tensor
-from torchegranate.distributions._utils import _update_parameter
-from torchegranate.distributions._utils import _check_parameter
+from torchegranate._utils import _cast_as_tensor
+from torchegranate._utils import _update_parameter
+from torchegranate._utils import _check_parameter
 
 from nose.tools import assert_almost_equal
 from nose.tools import assert_equal
@@ -355,6 +355,22 @@ def test_check_parameters_minmax_values_float():
 		max_value=24)
 	assert_raises(ValueError, _check_parameter, x, "x", min_value=0.0,
 		max_value=6)
+
+
+def test_check_parameters_value_sum_float():
+	x = torch.tensor([1.1, 2.3, 7.8], dtype=torch.float32)
+	_check_parameter(x, "x", value_sum=torch.sum(x))
+
+	assert_raises(ValueError, _check_parameter, x, "x", value_sum=-0.2)
+	assert_raises(ValueError, _check_parameter, x, "x", value_sum=torch.sum(x)
+		+2e-6)
+
+
+	x = 1.5
+	_check_parameter(x, "x", value_sum=x)
+
+	assert_raises(ValueError, _check_parameter, x, "x", value_sum=-0.2)
+	assert_raises(ValueError, _check_parameter, x, "x", value_sum=x+2e-6)
 
 
 def test_check_parameters_value_set_bool():

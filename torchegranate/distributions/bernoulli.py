@@ -3,10 +3,10 @@
 
 import torch
 
-from ._utils import _cast_as_tensor
-from ._utils import _update_parameter
-from ._utils import _check_parameter
-from ._utils import eps
+from .._utils import _cast_as_tensor
+from .._utils import _update_parameter
+from .._utils import _check_parameter
+from .._utils import eps
 
 from ._distribution import Distribution
 
@@ -78,15 +78,15 @@ class Bernoulli(Distribution):
 
 		return X.matmul(self._log_probs) + (1-X).matmul(self._log_inv_probs)
 
-	def summarize(self, X, sample_weights=None):
+	def summarize(self, X, sample_weight=None):
 		if self.frozen == True:
 			return
 
-		X, sample_weights = super().summarize(X, sample_weights=sample_weights)
+		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		X = _check_parameter(X, "X", value_set=(0, 1))
 
-		self._w_sum += torch.sum(sample_weights, dim=0)
-		self._xw_sum += torch.sum(X * sample_weights, dim=0)
+		self._w_sum += torch.sum(sample_weight, dim=0)
+		self._xw_sum += torch.sum(X * sample_weight, dim=0)
 
 	def from_summaries(self):
 		if self.frozen == True:

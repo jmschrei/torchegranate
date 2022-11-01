@@ -7,9 +7,9 @@ import pytest
 
 from torchegranate.distributions import Categorical
 
-from _utils import _test_initialization_raises_one_parameter
-from _utils import _test_predictions
-from _utils import _test_raises
+from ._utils import _test_initialization_raises_one_parameter
+from ._utils import _test_predictions
+from ._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
@@ -338,14 +338,14 @@ def test_summarize(X, probs):
 def test_summarize_weighted(X, w, probs):
 	for param in probs, None:
 		d = Categorical(param)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 		assert_array_almost_equal(d._xw_sum,
 			[[0., 1., 0., 2.],
              [2., 0., 1., 0.],
              [1., 2., 0., 0.]])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 		assert_array_almost_equal(d._xw_sum,
 			[[5., 2., 2., 2.],
@@ -353,7 +353,7 @@ def test_summarize_weighted(X, w, probs):
              [8., 2., 1., 0.]],)
 
 		d = Categorical(param)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 		assert_array_almost_equal(d._xw_sum,
 			[[5., 2., 2., 2.],
@@ -366,14 +366,14 @@ def test_summarize_weighted_flat(X, w, probs):
 
 	for param in probs, None:
 		d = Categorical(param)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 		assert_array_almost_equal(d._xw_sum,
 			[[0., 1., 0., 2.],
              [2., 0., 1., 0.],
              [1., 2., 0., 0.]])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 		assert_array_almost_equal(d._xw_sum,
 			[[5., 2., 2., 2.],
@@ -381,7 +381,7 @@ def test_summarize_weighted_flat(X, w, probs):
              [8., 2., 1., 0.]],)
 
 		d = Categorical(param)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 		assert_array_almost_equal(d._xw_sum,
 			[[5., 2., 2., 2.],
@@ -391,14 +391,14 @@ def test_summarize_weighted_flat(X, w, probs):
 
 def test_summarize_weighted_2d(X):
 	d = Categorical()
-	d.summarize(X[:4], sample_weights=X[:4])
+	d.summarize(X[:4], sample_weight=X[:4])
 	assert_array_almost_equal(d._w_sum, [7., 5., 5.])
 	assert_array_almost_equal(d._xw_sum,
 		[[0., 2., 2., 3.],
          [0., 1., 4., 0.],
          [0., 1., 4., 0.]])
 
-	d.summarize(X[4:], sample_weights=X[4:])
+	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [10., 8., 7.])
 	assert_array_almost_equal(d._xw_sum,
 		[[0., 3., 4., 3.],
@@ -406,7 +406,7 @@ def test_summarize_weighted_2d(X):
          [0., 1., 6., 0.]])
 
 	d = Categorical()
-	d.summarize(X, sample_weights=X)
+	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [10., 8., 7.])
 	assert_array_almost_equal(d._xw_sum,
 		[[0., 3., 4., 3.],
@@ -490,14 +490,14 @@ def test_from_summaries(X, probs):
 def test_from_summaries_weighted(X, w, probs):
 	for param in probs, None:
 		d = Categorical(probs)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		d.from_summaries()
 		_test_fit_params(d, 
 			[[0.      , 0.333333, 0.      , 0.666667],
              [0.666667, 0.      , 0.333333, 0.      ],
              [0.333333, 0.666667, 0.      , 0.      ]])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		d.from_summaries()
 		_test_fit_params(d, 
 			[[0.625, 0.125, 0.25 , 0.   ],
@@ -505,7 +505,7 @@ def test_from_summaries_weighted(X, w, probs):
              [0.875, 0.   , 0.125, 0.   ]])
 
 		d = Categorical(probs)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		d.from_summaries()
 		_test_fit_params(d, 
 			[[0.454545, 0.181818, 0.181818, 0.181818],
@@ -567,7 +567,7 @@ def test_from_summaries_inertia(X, w, probs):
 
 def test_from_summaries_weighted_inertia(X, w, probs):
 	d = Categorical(probs, inertia=0.5)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	d.from_summaries()
 	_test_fit_params(d, 
 		[[0.277273, 0.190909, 0.190909, 0.340909],
@@ -623,7 +623,7 @@ def test_from_summaries_frozen(X, w, probs):
 	_test_fit_params(d, probs)
 
 	d = Categorical(probs, frozen=True)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
 	assert_array_almost_equal(d._xw_sum,
 		[[0., 0., 0., 0.],
@@ -687,20 +687,20 @@ def test_fit(X, probs):
 def test_fit_weighted(X, w, probs):
 	for param in probs, None:
 		d = Categorical(probs)
-		d.fit(X[:4], sample_weights=w[:4])
+		d.fit(X[:4], sample_weight=w[:4])
 		_test_fit_params(d, 
 			[[0.      , 0.333333, 0.      , 0.666667],
              [0.666667, 0.      , 0.333333, 0.      ],
              [0.333333, 0.666667, 0.      , 0.      ]])
 
-		d.fit(X[4:], sample_weights=w[4:])
+		d.fit(X[4:], sample_weight=w[4:])
 		_test_fit_params(d, 
 			[[0.625, 0.125, 0.25 , 0.   ],
              [0.   , 1.   , 0.   , 0.   ],
              [0.875, 0.   , 0.125, 0.   ]])
 
 		d = Categorical(probs)
-		d.fit(X, sample_weights=w)
+		d.fit(X, sample_weight=w)
 		_test_fit_params(d, 
 			[[0.454545, 0.181818, 0.181818, 0.181818],
              [0.181818, 0.727273, 0.090909, 0.      ],

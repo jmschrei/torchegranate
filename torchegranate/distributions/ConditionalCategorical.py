@@ -27,12 +27,12 @@ class ConditionalCategorical(torch.nn.Module):
 	def marginal(self, dims=0):
 		return Categorical(self.probs.sum(axis=axis))
 
-	def summarize(self, X, sample_weights=None):
-		if sample_weights is None:
-			sample_weights = torch.ones(len(X))
+	def summarize(self, X, sample_weight=None):
+		if sample_weight is None:
+			sample_weight = torch.ones(len(X))
 
 		for i in range(len(X)):
-			self._counts[tuple(X[i])] += sample_weights[i]
+			self._counts[tuple(X[i])] += sample_weight[i]
 
 	def from_summaries(self):
 		self._counts += self.pseudocount

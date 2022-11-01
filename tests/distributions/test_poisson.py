@@ -7,11 +7,11 @@ import pytest
 
 from torchegranate.distributions import Poisson
 
-from _utils import _test_initialization_raises_one_parameter
-from _utils import _test_initialization
-from _utils import _test_predictions
-from _utils import _test_efd_from_summaries
-from _utils import _test_raises
+from ._utils import _test_initialization_raises_one_parameter
+from ._utils import _test_initialization
+from ._utils import _test_predictions
+from ._utils import _test_efd_from_summaries
+from ._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
@@ -390,59 +390,45 @@ def test_log_probability_raises(X, lambdas):
 
 
 def test_summarize(X, X2, lambdas):
-	d = Poisson(lambdas)
-	d.summarize(X[:4])
-	assert_array_almost_equal(d._w_sum, [4.0, 4.0, 4.0])
-	assert_array_almost_equal(d._xw_sum, [4.0, 5.0, 5.0])
+	for param in lambdas, None:
+		d = Poisson(lambdas)
+		d.summarize(X[:4])
+		assert_array_almost_equal(d._w_sum, [4.0, 4.0, 4.0])
+		assert_array_almost_equal(d._xw_sum, [4.0, 5.0, 5.0])
 
-	d.summarize(X[4:])
-	assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
-	assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
+		d.summarize(X[4:])
+		assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
+		assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
 
-	d = Poisson(lambdas)
-	d.summarize(X)
-	assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
-	assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
-
-
-	d = Poisson()
-	d.summarize(X[:4])
-	assert_array_almost_equal(d._w_sum, [4.0, 4.0, 4.0])
-	assert_array_almost_equal(d._xw_sum, [4.0, 5.0, 5.0])
-
-	d.summarize(X[4:])
-	assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
-	assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
-
-	d = Poisson()
-	d.summarize(X)
-	assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
-	assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
+		d = Poisson(lambdas)
+		d.summarize(X)
+		assert_array_almost_equal(d._w_sum, [7.0, 7.0, 7.0])
+		assert_array_almost_equal(d._xw_sum, [14.0, 8.0, 9.0])
 
 
 def test_summarize_weighted(X, X2, w, w2, lambdas):
 	d = Poisson(lambdas)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 2., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 	d = Poisson(lambdas)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 
 	d = Poisson()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 	d = Poisson([0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
@@ -451,43 +437,43 @@ def test_summarize_weighted_flat(X, X2, w, w2, lambdas):
 	w = numpy.array(w)[:,0] 
 
 	d = Poisson(lambdas)
-	d.summarize(X[:4], sample_weights=w[:4])
+	d.summarize(X[:4], sample_weight=w[:4])
 	assert_array_almost_equal(d._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d._xw_sum, [1., 2., 2.])
 
-	d.summarize(X[4:], sample_weights=w[4:])
+	d.summarize(X[4:], sample_weight=w[4:])
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 	d = Poisson(lambdas)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
 	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
 
 
 	d = Poisson()
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 	d = Poisson([0, 0, 0, 0])
-	d.summarize(X2, sample_weights=w2)
+	d.summarize(X2, sample_weight=w2)
 	assert_array_almost_equal(d._w_sum, [4.6, 4.6, 4.6, 4.6])
 	assert_array_almost_equal(d._xw_sum, [23.02, 4.4, 9.61, 5.94])
 
 
 def test_summarize_weighted_2d(X):
 	d = Poisson()
-	d.summarize(X[:4], sample_weights=X[:4])
+	d.summarize(X[:4], sample_weight=X[:4])
 	assert_array_almost_equal(d._w_sum, [4., 5., 5.])
 	assert_array_almost_equal(d._xw_sum, [6., 9., 9.])
 
-	d.summarize(X[4:], sample_weights=X[4:])
+	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [14., 8., 9.])
 	assert_array_almost_equal(d._xw_sum, [44., 12., 25.])
 
 	d = Poisson()
-	d.summarize(X, sample_weights=X)
+	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [14., 8., 9.])
 	assert_array_almost_equal(d._xw_sum, [44., 12., 25.])
 
@@ -569,18 +555,18 @@ def test_from_summaries(X, lambdas):
 def test_from_summaries_weighted(X, w, lambdas):
 	for param in lambdas, None:
 		d = Poisson(lambdas)
-		d.summarize(X[:4], sample_weights=w[:4])
+		d.summarize(X[:4], sample_weight=w[:4])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[0.333333, 0.666667, 0.666667])
 
-		d.summarize(X[4:], sample_weights=w[4:])
+		d.summarize(X[4:], sample_weight=w[4:])
 		d.from_summaries()
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[3. , 1. , 0.5])
 
 		d = Poisson(lambdas)
-		d.summarize(X, sample_weights=w)
+		d.summarize(X, sample_weight=w)
 		d.from_summaries()
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[2.272727, 0.909091, 0.545455])
@@ -624,7 +610,7 @@ def test_from_summaries_inertia(X, w, lambdas):
 
 def test_from_summaries_weighted_inertia(X, w, lambdas):
 	d = Poisson(lambdas, inertia=0.3)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	d.from_summaries()
 	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 		[1.950909, 1.176364, 1.011818])
@@ -669,7 +655,7 @@ def test_from_summaries_frozen(X, w, lambdas):
 	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", lambdas)
 
 	d = Poisson(lambdas, frozen=True)
-	d.summarize(X, sample_weights=w)
+	d.summarize(X, sample_weight=w)
 	assert_array_almost_equal(d._w_sum, [0.0, 0.0, 0.0])
 	assert_array_almost_equal(d._xw_sum, [0.0, 0.0, 0.0])
 
@@ -737,16 +723,16 @@ def test_fit(X, lambdas):
 def test_fit_weighted(X, w, lambdas):
 	for param in lambdas, None:
 		d = Poisson(param)
-		d.fit(X[:4], sample_weights=w[:4])
+		d.fit(X[:4], sample_weight=w[:4])
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[0.333333, 0.666667, 0.666667])
 
-		d.fit(X[4:], sample_weights=w[4:])
+		d.fit(X[4:], sample_weight=w[4:])
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[3., 1. , 0.5])
 
 		d = Poisson(param)
-		d.fit(X, sample_weights=w)
+		d.fit(X, sample_weight=w)
 		_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 			[2.272727, 0.909091, 0.545455])
 
@@ -757,7 +743,7 @@ def test_fit_weighted(X, w, lambdas):
 	w = [[1.1], [3.5]]
 
 	d = Poisson()
-	d.fit(X, sample_weights=w)
+	d.fit(X, sample_weight=w)
 	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
 		[5.004348, 0.956522, 2.089131, 1.291304])
 

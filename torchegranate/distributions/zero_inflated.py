@@ -3,12 +3,14 @@
 
 import torch
 
-from ..gmm import GeneralMixtureModel
-
-from ._utils import _cast_as_tensor
-from ._utils import _update_parameter
+from .._utils import _cast_as_tensor
+from .._utils import _update_parameter
+from .._utils import _check_parameter
 
 from ._distribution import Distribution
+
+from ..gmm import GeneralMixtureModel
+
 from .dirac_delta import DiracDelta
 
 

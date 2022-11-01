@@ -3,69 +3,52 @@
 
 import torch
 
-class BayesClassifier(torch.nn.Module):
-	def __init__(self, distributions=None, priors=None, max_iters=10):
-		self.distributions = distributions
-		self.priors = torch.tensor(priors)
-		self.max_iters = max_iters
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
+from ._utils import _check_parameter
+from ._utils import _reshape_weights
+
+from ._bayes import BayesMixin
+
+from .distributions._distribution import Distribution
+
+
+class BayesClassifier(BayesMixin, Distribution):
+	def __init__(self, distributions, priors=None, inertia=0.0, frozen=False):
+		super().__init__(inertia=inertia, frozen=frozen)
+		self.name = "BayesClassifier"
+
+		self.distributions = _check_parameter(distributions, "distributions",
+			dtypes=(list, tuple))
+
+		self.priors = _check_parameter(_cast_as_tensor(priors), "priors", 
+			min_value=0, max_value=1, ndim=1, value_sum=1.0, 
+			shape=(len(distributions),))
+
 		self.m = len(distributions)
+
+		if all(d._initialized for d in distributions):
+			self._initialized = True
+			self.d = distributions[0].d
+			if self.priors is None:
+				self.priors = torch.ones(self.m) / self.m
+
+		else:
+			self._initialized = False
+			self.d = None
+		
 		self._reset_cache()
 
-	def _initialize(self, m, d):
-		self.m = m
-		self.priors = torch.ones(m) / m
-		
-	def _reset_cache(self):
-		self._log_priors = torch.log(self.priors)
-		self._w_sum = torch.zeros_like(self._log_priors)
-		self._n_sum = 0
+	def summarize(self, X, y, sample_weight=None):
+		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
+		y = _check_parameter(_cast_as_tensor(y), "y", min_value=0, 
+			max_value=self.m-1, ndim=1, shape=(len(X),))
+		sample_weight = _check_parameter(sample_weight, "sample_weight", 
+			min_value=0, shape=(-1, self.d))
 
-	def _emission_matrix(self, X):
-		n, d = X.shape
-		m = len(self.distributions)
-
-		e = torch.empty(n, m, dtype=X.dtype)
-		for i, d in enumerate(self.distributions):
-			e[:,i] = d.log_probability(X)
-
-		return e + self._log_priors
-
-	def log_probability(self, X):
-		e = self._emission_matrix(X)
-		return torch.logsumexp(e, dim=1)
-
-	def predict(self, X):
-		e = self._emission_matrix(X)
-		return torch.argmax(e, dim=1)
-
-	def predict_proba(self, X):
-		e = self._emission_matrix(X)
-		return torch.exp(e - torch.logsumexp(e, dim=1, keepdims=True))
-		
-	def predict_log_proba(self, X):
-		e = self._emission_matrix(X)
-		return e - torch.logsumexp(e, dim=1, keepdims=True)
-
-	def fit(self, X, y, sample_weights=None):
-		initial_logp = self.log_probability(X).sum()
-		
-		self.summarize(X, sample_weights=sample_weights)
-		self.from_summaries()
-
-		last_logp = logp
-		logp = self.log_probability(X).sum()
-
-	def summarize(self, X, y, sample_weights=None):
 		for j, d in enumerate(self.distributions):
-			idxs = y == j
-			d.summarize(X[idxs], e[idxs, j:j+1])
-			self._w_sum[j] += idxs.sum()
+			idx = y == j
+			d.summarize(X[idx], sample_weight[idx])
 
-		self._n_sum += e.shape[0]
-
-	def from_summaries(self):
-		for d in self.distributions:
-			d.from_summaries()
-
-		self.priors = self._w_sum / self._n_sum
-		self._reset_cache()
+			if self.frozen == False:
+				self._w_sum[j] += sample_weight[idx].mean(dim=-1).sum()

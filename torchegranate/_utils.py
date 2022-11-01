@@ -40,7 +40,8 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 
 
 def _check_parameter(parameter, name, min_value=None, max_value=None, 
-	value_set=None, dtypes=None, ndim=None, shape=None):
+	value_sum=None, value_set=None, dtypes=None, ndim=None, shape=None,
+	epsilon=1e-6):
 	"""Ensures that the parameter falls within a valid range.
 
 	This check accepts several optional conditions that can be used to ensure
@@ -68,6 +69,9 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 		The maximum numeric value that any values in the parameter can take.
 		Default is None.
 
+	value_sum: float or None, optional
+		The approximate sum, within eps, of the parameter. Default is None.
+
 	value_set: tuple or list or set or None, optional
 		The set of values that each element in the parameter can take. Default
 		is None.
@@ -82,6 +86,10 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 	shape: tuple or None, optional
 		The shape of the parameter. -1 can be used to accept any value for that
 		dimension.
+
+	epsilon: float, optional
+		When using `value_sum`, this is the maximum difference acceptable.
+		Default is 1e-6.
 	"""
 
 	vector = (numpy.ndarray, torch.Tensor, torch.nn.Parameter)
@@ -120,6 +128,17 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 			if parameter > max_value:
 				raise ValueError("Parameter {} must have a maximum value below"
 					" {}".format(name, max_value))
+
+
+	if value_sum is not None:
+		if isinstance(parameter, vector):
+			if torch.abs(torch.sum(parameter) - value_sum) > epsilon:
+				raise ValueError("Parameter {} must sum to {}".format(name, 
+					value_sum))
+		else:
+			if abs(parameter - value_sum) > epsilon:
+				raise ValueError("Parameter {} must sum to {}".format(name, 
+					value_sum))
 
 
 	if value_set is not None:
@@ -172,3 +191,43 @@ def _check_shapes(parameters, names):
 			if len(parameters[i]) != len(parameters[j]):
 				raise ValueError("Parameters {} and {} must be the same "
 					"shape.".format(names[i], names[j]))
+
+
+def _reshape_weights(X, sample_weight):
+	"""Handle a sample weight tensor by creating and reshaping it.
+
+	This function will take any weight input, including None, 1D weights, and
+	2D weights, and shape it into a 2D matrix with the same shape as the data
+	X also passed in.
+
+	Both elements must be PyTorch tensors.
+
+
+	Parameters
+	----------
+	X: torch.tensor, ndims=2
+		The data being weighted. The contents of this tensor are not used, only
+		the shape is.
+
+	sample_weight: torch.tensor or None
+		The weight for each element in the data or None.
+
+
+	Returns
+	-------
+	sample_weight: torch.tensor, shape=X.shape
+		A tensor with the same dimensions as X with elements repeated as
+		necessary.
+	"""
+
+	if sample_weight is None:
+		sample_weight = torch.ones(*X.shape)
+	elif len(sample_weight.shape) == 1: 
+		sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[1])
+	elif sample_weight.shape[1] == 1:
+		sample_weight = sample_weight.expand(-1, X.shape[1])
+
+	_check_parameter(sample_weight, "sample_weight", min_value=0, 
+		shape=X.shape, ndim=2)
+
+	return sample_weight
