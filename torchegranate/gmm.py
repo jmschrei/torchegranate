@@ -13,7 +13,7 @@ from ._bayes import BayesMixin
 
 
 class GeneralMixtureModel(BayesMixin, Distribution):
-	def __init__(self, distributions, priors=None, max_iter=10, threshold=0.1, 
+	def __init__(self, distributions, priors=None, max_iter=10, tol=0.1, 
 		inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "GeneralMixtureModel"
@@ -38,7 +38,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 			self.d = None
 		
 		self.max_iter = max_iter
-		self.threshold = threshold
+		self.tol = tol
 		self._reset_cache()
 
 	def fit(self, X, sample_weight=None):
@@ -52,7 +52,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 			last_logp = logp
 			logp = self.log_probability(X).sum()
 
-			if logp - last_logp < self.threshold:
+			if logp - last_logp < self.tol:
 				break
 
 		return self

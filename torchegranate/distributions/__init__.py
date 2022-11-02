@@ -9,3 +9,4 @@ from .lognormal import LogNormal
 from .normal import Normal
 from .poisson import Poisson
 from .uniform import Uniform
+from .student_t import StudentT
