@@ -18,6 +18,27 @@ NEGINF = float("-inf")
 
 _parameter = lambda x: torch.nn.Parameter(x, requires_grad=False)
 
+
+def _check_inputs(model, X, priors, emissions):
+	n, k, d = X.shape
+	if X.device != model.device:
+		X = X.to(model.device)
+
+	if priors is None:
+		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
+	elif priors.device != model.device:
+		priors = priors.to(model.device)
+
+	if emissions is None:
+		emissions = torch.empty((k, model.n_nodes, n), device=model.device, 
+			dtype=torch.float64)
+		for i, node in enumerate(model.nodes):
+			emissions[:, i] = node.distribution.log_probability(X.reshape(
+				-1, d)).reshape(n, k).T
+
+	return X, priors, emissions
+
+
 class HiddenMarkovModel(GraphMixin, Distribution):
 	def __init__(self, nodes=[], edges=[], batch_size=2048, max_iter=10, 
 		tol=0.1, inertia=0.0, frozen=False):
@@ -87,40 +108,24 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.expected_ends = _parameter(torch.zeros(self.n_nodes, 
 			dtype=torch.float64))
 
-	def _check_inputs(self, X, priors, emissions):
-		n, k, d = X.shape
-		if X.device != self.device:
-			X = X.to(self.device)
-
-		if priors is None:
-			priors = torch.zeros(1, device=self.device).expand(n, k, self.n_nodes)
-		elif priors.device != self.device:
-			priors = priors.to(self.device)
-
-		if emissions is None:
-			emissions = torch.empty((k, self.n_nodes, n), device=self.device, 
-				dtype=torch.float64)
-			for i, node in enumerate(self.nodes):
-				emissions[:, i] = node.distribution.log_probability(X.reshape(
-					-1, d)).reshape(n, k).T
-
-		return X, priors, emissions
 
 	def forward(self, X, priors=None, emissions=None):
 		n, k, d = X.shape
-		X, priors, emissions = self._check_inputs(X, priors, emissions)
+		X, priors, emissions = _check_inputs(self, X, priors, emissions)
 
 		f = torch.zeros(k, n, self.n_nodes, device=self.device, dtype=torch.float64) + float("-inf")
 		f[0] = self.starts + emissions[0].T + priors[:, 0]
 
 		for i in range(1, k):
-			p = torch.tile(self.edge_log_probabilities, dims=(n, 1))
-			p += f[i-1, :, self.edge_starts]
+			p = f[i-1, :, self.edge_starts]
+			p += self.edge_log_probabilities.expand(n, -1)
+
 			alpha = p.max()
 			p = torch.exp(p - alpha)
 
 			z = torch.zeros_like(f[i])
 			z.scatter_add_(1, self.edge_ends.expand(n, -1), p)
+
 			f[i] = alpha + torch.log(z) + emissions[i].T + priors[:, i]
 
 		f = f.permute(1, 0, 2)
@@ -128,15 +133,16 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 	def backward(self, X, priors=None, emissions=None):
 		n, k, d = X.shape
-		X, priors, emissions = self._check_inputs(X, priors, emissions)
+		X, priors, emissions = _check_inputs(self, X, priors, emissions)
 
 		b = torch.zeros(k, n, self.n_nodes, device=self.device, dtype=torch.float64) + float("-inf")
 		b[-1] = self.ends
 
 		for i in range(k-2, -1, -1):
-			p = torch.tile(self.edge_log_probabilities, dims=(n, 1))
-			p += b[i+1, :, self.edge_ends]
+			p = b[i+1, :, self.edge_ends]
 			p += emissions[i+1, self.edge_ends].T + priors[:, i+1, self.edge_ends]
+			p += self.edge_log_probabilities.expand(n, -1)
+
 			alpha = p.max()
 			p = torch.exp(p - alpha)
 
@@ -149,7 +155,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 	def forward_backward(self, X, priors=None, return_logps=False):
 		n, k, d = X.shape
-		X, priors, emissions = self._check_inputs(X, priors, None)
+		X, priors, emissions = _check_inputs(self, X, priors, None)
 
 		f = self.forward(X, priors=priors, emissions=emissions)
 		b = self.backward(X, priors=priors, emissions=emissions)
@@ -232,3 +238,31 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.expected_transitions *= 0
 		self.expected_starts *= 0
 		self.expected_ends *= 0
+
+	@classmethod
+	def from_matrix(cls, distributions, transitions, starts, ends, **kwargs):
+		nodes = []
+		for i, d in enumerate(distributions):
+			node = Node(d, name=str(i))
+			nodes.append(node)
+
+		edges = []
+		for i in range(transitions.shape[0]):
+			for j in range(transitions.shape[1]):
+				if transitions[i, j] != 0:
+					edge = nodes[i], nodes[j], transitions[i, j]
+					edges.append(edge)
+
+		model = cls(nodes=nodes, edges=edges, **kwargs)
+
+		for i in range(len(starts)):
+			if starts[i] != 0:
+				model.add_edge(model.start, nodes[i], starts[i])
+
+		for i in range(len(ends)):
+			if ends[i] != 0:
+				model.add_edge(nodes[i], model.end, ends[i])
+
+		model.bake() 
+		return model
+
