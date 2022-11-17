@@ -24,4 +24,13 @@ The rewrite was motivated by three main reasons:
 ### Frequently Asked Questions
 
 > Why can't we just use `torch.distributions`?
+
 `torch.distributions` is a great implementation of the statistical characteristics of many distributions, but does not implement fitting these distributions to data or using them as components of larger functions. If all you need to do is calculate log probabilities, or sample, given parameters (perhaps as output from neural network components), `torch.distributions` is a great, simple, alternative.
+
+> What models are implemented in torchegranate?
+
+Currently, implementations of many distributions are included, as well as general mixture models, Bayes classifiers (including naive Bayes), hidden Markov models, and Markov chains. Bayesian networks will be added soon but are not yet included.
+
+> How much faster is this than pomegranate?
+
+It depends on the method being used. Most individual distributions are approximately 2-3x faster. Some distributions, such as the categorical distributions, can be over 10x faster. These will be even faster if a GPU is used.
