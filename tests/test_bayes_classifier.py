@@ -100,7 +100,7 @@ def test_initialize(X):
 	model = BayesClassifier(d)
 
 	assert model.d is None
-	assert model.m == 2
+	assert model.k == 2
 	assert model._initialized == False
 	assert_raises(AttributeError, getattr, model, "_w_sum")
 	assert_raises(AttributeError, getattr, model, "_log_priors")
@@ -109,7 +109,7 @@ def test_initialize(X):
 	assert model._initialized == True
 	assert model.priors.shape[0] == 2
 	assert model.d == 3
-	assert model.m == 2
+	assert model.k == 2
 	assert_array_almost_equal(model.priors, [0.5, 0.5])
 	assert_array_almost_equal(model._w_sum, [0.0, 0.0])
 
@@ -117,7 +117,7 @@ def test_initialize(X):
 	assert model._initialized == True
 	assert model.priors.shape[0] == 2
 	assert model.d == 2
-	assert model.m == 2
+	assert model.k == 2
 	assert_array_almost_equal(model.priors, [0.5, 0.5])
 	assert_array_almost_equal(model._w_sum, [0.0, 0.0])
 
@@ -125,13 +125,13 @@ def test_initialize(X):
 	model = BayesClassifier(d)
 	assert model._initialized == True
 	assert model.d == 2
-	assert model.m == 3
+	assert model.k == 3
 
 	model._initialize(3)
 	assert model._initialized == True
 	assert model.priors.shape[0] == 3
 	assert model.d == 3
-	assert model.m == 3
+	assert model.k == 3
 	assert_array_almost_equal(model.priors, [1./3, 1./3, 1./3])
 	assert_array_almost_equal(model._w_sum, [0.0, 0.0, 0.0])
 

@@ -13,24 +13,18 @@ from .distributions._distribution import Distribution
 
 
 class BayesMixin(torch.nn.Module):
-	def _initialize(self, d):
-		self.priors = torch.ones(self.m) / self.m
-
-		self._initialized = True
-		super()._initialize(d)
-
 	def _reset_cache(self):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.m)
+		self._w_sum = torch.zeros(self.k)
 		self._log_priors = torch.log(self.priors)
 
 	def _emission_matrix(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
 			shape=(-1, self.d))
 
-		e = torch.empty(X.shape[0], self.m)
+		e = torch.empty(X.shape[0], self.k)
 		for i, d in enumerate(self.distributions):
 			e[:, i] = d.log_probability(X)
 

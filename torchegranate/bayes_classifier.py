@@ -25,13 +25,13 @@ class BayesClassifier(BayesMixin, Distribution):
 			min_value=0, max_value=1, ndim=1, value_sum=1.0, 
 			shape=(len(distributions),))
 
-		self.m = len(distributions)
+		self.k = len(distributions)
 
 		if all(d._initialized for d in distributions):
 			self._initialized = True
 			self.d = distributions[0].d
 			if self.priors is None:
-				self.priors = torch.ones(self.m) / self.m
+				self.priors = torch.ones(self.k) / self.k
 
 		else:
 			self._initialized = False
@@ -39,10 +39,16 @@ class BayesClassifier(BayesMixin, Distribution):
 		
 		self._reset_cache()
 
+	def _initialize(self, d):
+		self.priors = torch.ones(self.k) / self.k
+
+		self._initialized = True
+		super()._initialize(d)
+
 	def summarize(self, X, y, sample_weight=None):
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		y = _check_parameter(_cast_as_tensor(y), "y", min_value=0, 
-			max_value=self.m-1, ndim=1, shape=(len(X),))
+			max_value=self.k-1, ndim=1, shape=(len(X),))
 		sample_weight = _check_parameter(sample_weight, "sample_weight", 
 			min_value=0, shape=(-1, self.d))
 

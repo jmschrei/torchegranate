@@ -1,134 +1,132 @@
 # kmeans.py
 # Author: Jacob Schreiber
 
-import torch
 import time
+import torch
 
-from apricot import FacilityLocationSelection
-from apricot import FeatureBasedSelection
+from ._utils import _cast_as_tensor
+from ._utils import _update_parameter
+from ._utils import _check_parameter
+from ._utils import _reshape_weights
+from ._utils import _initialize_centroids
 
-def _initialize_centroids(X, k, algorithm='first-k'):
-	if algorithm == 'first-k':
-		return torch.clone(X[:k])
+from ._utils import eps
 
-	elif algorithm == 'random':
-		idxs = torch.arange(X.shape[0])
-		torch.shuffle(idxs)
-		return torch.clone(X[idxs[:k]])
+class KMeans(torch.nn.Module):
+	def __init__(self, k=None, centroids=None, init='first-k', max_iter=10, 
+		tol=0.1, inertia=0.0, frozen=False, random_state=None, verbose=False):
+		super().__init__()
+		self.name = "KMeans"
 
-	elif algorithm == 'submodular-facility-location':
-		selector = FacilityLocationSelection(k)
-		a = selector.fit_transform(X)
-		print(type(a), a.shape)
-		dawdwadaw
+		self.centroids = _check_parameter(_cast_as_tensor(centroids, 
+			dtype=torch.float32), "centroids", ndim=2)
+		self.k = _check_parameter(_cast_as_tensor(k), "k", ndim=0, min_value=2,
+			dtypes=(int, torch.int32, torch.int64))
 
-	elif algorithm == 'submodular-feature-based':
-		selector = FeatureBasedSelection(k)
-		return selector.fit_transform(X)
+		self.init = _check_parameter(init, "init", value_set=("random", 
+			"first-k", "submodular-facility-location", 
+			"submodular-feature-based"), ndim=0, dtypes=(str,))
+		self.max_iter = _check_parameter(_cast_as_tensor(max_iter), "max_iter",
+			ndim=0, min_value=1, dtypes=(int, torch.int32, torch.int64))
+		self.tol = _check_parameter(_cast_as_tensor(tol), "tol", ndim=0,
+			min_value=0)
+		self.inertia = _check_parameter(_cast_as_tensor(inertia), "inertia",
+			ndim=0, min_value=0.0, max_value=1.0)
+		self.frozen = _check_parameter(_cast_as_tensor(frozen), "frozen",
+			ndim=0, value_set=(True, False))
+		self.random_state = random_state
+		self.verbose = _check_parameter(verbose, "verbose", 
+			value_set=(True, False))
 
-	elif algorithm == 'KMeans':
-		selector = KMeans(k=k)
-		selector.fit(X)
-		return torch.clone(selector.centroids) 
+		if self.k is None and self.centroids is None:
+			raise ValueError("Must specify one of `k` or `centroids`.")
 
-
-
-class KMeans():
-	def __init__(self, k=None, centroids=None, init='random', stop_threshold=0.01, max_iters=100, frozen=True):
-		self.k = k
-		self.centroids = centroids
-
-		if centroids is None:
-			self._initialized = False
-			self.d = None
-		else:
-			self._initialized = True
-			self.d = centroids.shape[1]
-
-		self.init = init
-		self.stop_threshold = stop_threshold
-		self.max_iters = max_iters
-		self.frozen = frozen
-
+		self.k = len(centroids) if centroids else self.k
+		self.d = len(centroids[0]) if centroids else None
+		self._initialized = centroids is not None
 		self._reset_cache()
 
-
-	def _reset_cache(self):
-		if self._initialized:
-			self._x_sum = torch.zeros(self.k, self.d)
-			self._w_sum = torch.zeros(self.k)
-		else:
-			self._x_sum = None
-			self._w_sum = None
-
-
 	def _initialize(self, X):
-		self.centroids = _initialize_centroids(X, self.k, algorithm=self.init)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		self.centroids = _initialize_centroids(X, self.k, algorithm=self.init,
+			random_state=self.random_state)
+
 		self.d = X.shape[1]
 		self._initialized = True
 		self._reset_cache()
 
+	def _reset_cache(self):
+		if self._initialized == False:
+			return
+
+		self._w_sum = torch.zeros(self.k, self.d)
+		self._xw_sum = torch.zeros(self.k, self.d)
+		self._centroid_sum = torch.sum(self.centroids**2, axis=1).unsqueeze(0)
+
 	def _distances(self, X):
-		d1 = torch.sum(X**2, axis=1).unsqueeze(1)
-		d2 = torch.matmul(X, self.centroids.T)
-		d3 = torch.sum(self.centroids**2, axis=1).unsqueeze(0)
-		return torch.sqrt(d1 - 2*d2 + d3)
+		X = _check_parameter(_cast_as_tensor(X, dtype=torch.float32), "X", 
+			ndim=2, shape=(-1, self.d))
+
+		XX = torch.sum(X**2, axis=1).unsqueeze(1)
+		Xc = torch.matmul(X, self.centroids.T)
+		
+		d = torch.clamp(XX - 2*Xc + self._centroid_sum, min=0)
+		return torch.sqrt(d)
 
 	def predict(self, X):
 		return self._distances(X).argmin(axis=1)
 
-	def summarize(self, X, sample_weights=None):
+	def summarize(self, X, sample_weight=None):
+		if self.frozen:
+			return 0
+
 		if not self._initialized:
 			self._initialize(X)
 
-		if sample_weights is None:
-			sample_weights = torch.ones(X.shape[0])
+		X = _check_parameter(_cast_as_tensor(X, dtype=torch.float32), "X", 
+			ndim=2, shape=(-1, self.d))
+		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
+			dtype=torch.float32))
 
-		y_hat = self.predict(X)
+		distances = self._distances(X)
+		y_hat = distances.argmin(dim=1).unsqueeze(1).expand(-1, self.d)
 
-		for i in range(self.k):
-			self._x_sum[i] += X[y_hat == i].sum(axis=0)
-			self._w_sum[i] += sample_weights[y_hat == i].sum()
+		self._w_sum.scatter_add_(0, y_hat, sample_weight)
+		self._xw_sum.scatter_add_(0, y_hat, X * sample_weight)
+		return distances.min(dim=1).values.sum()
 
 	def from_summaries(self):
-		self.centroids = self._x_sum / self._w_sum.unsqueeze(1)
+		if self.frozen:
+			return
+
+		centroids = self._xw_sum / self._w_sum
+		_update_parameter(self.centroids, centroids, self.inertia)
 		self._reset_cache()
 
-	def fit(self, X, sample_weights=None):
-		self._initialize(X)
-		d_initial = self._distances(X).min(axis=1).values.sum()
-		d_previous = d_initial
+	def fit(self, X, sample_weight=None):
+		d_current = None
+		for i in range(self.max_iter):
+			start_time = time.time()
 
-		for i in range(self.max_iters):
-			self.summarize(X)
+			d_previous = d_current
+			d_current = self.summarize(X, sample_weight=sample_weight)
+
+			if i > 0:
+				improvement = d_previous - d_current
+				duration = time.time() - start_time
+
+				if self.verbose:
+					print("[{}] Improvement: {}, Time: {:4.4}s".format(i, 
+						improvement, duration))
+
+				if improvement < self.tol:
+					break
+
 			self.from_summaries()
 
-			d_current = self._distances(X).min(axis=1).values.sum()
-
-			if d_previous - d_current < self.stop_threshold:
-				break
-
+		self._reset_cache()
 		return self
 
-
-n = 1000
-d = 20
-k = 3
-
-xs = []
-for i in range(k):
-	x = torch.randn(n, d) + i
-	xs.append(x)
-
-X = torch.cat(xs)
-centroids = torch.stack([x.mean(axis=0) for x in xs])
-
-tic = time.time()
-model = KMeans(k=k, init='submodular-facility-location').fit(X)
-toc1 = time.time() - tic
-
-toc2 = 0
-
-print(toc1, toc2)
-
-print(model.predict(X))
+	def fit_predict(self, X, sample_weight=None):
+		self.fit(X, sample_weight=sample_weight)
+		return self.predict(X)

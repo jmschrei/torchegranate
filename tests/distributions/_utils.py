@@ -98,7 +98,7 @@ def _test_raises(d, name, X, w=None, min_value=None, max_value=None):
 
 	assert_raises(ValueError, f, [X])
 	assert_raises(ValueError, f, X[0])
-	assert_raises((ValueError, TypeError), f, X[0][0])
+	assert_raises((ValueError, TypeError, RuntimeError), f, X[0][0])
 
 	if d._initialized == True:
 		assert_raises(ValueError, f, [x[:-1] for x in X])

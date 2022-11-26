@@ -47,6 +47,7 @@ class MarkovChain(Distribution):
 
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		self.d = X.shape[1]
 
 		logps = self.distributions[0].log_probability(X[:, :1])
 		for i, distribution in enumerate(self.distributions[1:-1]):
@@ -66,11 +67,13 @@ class MarkovChain(Distribution):
 	def summarize(self, X, sample_weight=None):
 		if self.frozen:
 			return
-			
+
 		if not self._initialized:
 			self._initialize(len(X[0]))
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		self.d = X.shape[1]
+		
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
 			dtype=torch.float32))[:,0]
 

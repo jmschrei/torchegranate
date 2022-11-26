@@ -4,9 +4,11 @@
 import numpy
 import torch
 
+from apricot import FacilityLocationSelection
+from apricot import FeatureBasedSelection
+
 
 eps = torch.finfo(torch.float32).eps
-
 
 def _cast_as_tensor(value, dtype=None):
 	"""Set the parameter.""" 
@@ -221,8 +223,9 @@ def _reshape_weights(X, sample_weight):
 	"""
 
 	if sample_weight is None:
-		sample_weight = torch.ones(*X.shape)
-	elif len(sample_weight.shape) == 1: 
+		return torch.ones(1).expand_as(X)
+	
+	if len(sample_weight.shape) == 1: 
 		sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[1])
 	elif sample_weight.shape[1] == 1:
 		sample_weight = sample_weight.expand(-1, X.shape[1])
@@ -231,3 +234,56 @@ def _reshape_weights(X, sample_weight):
 		shape=X.shape, ndim=2)
 
 	return sample_weight
+
+
+def _check_hmm_inputs(model, X, priors, emissions):
+	X = _cast_as_tensor(X, dtype=torch.float64)
+
+	n, k, d = X.shape
+	#if X.device != model.device:
+
+	#	X = X.to(model.device)
+
+	if priors is None:
+		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
+	elif priors.device != model.device:
+		priors = priors.to(model.device)
+
+	if emissions is None:
+		emissions = torch.empty((k, model.n_nodes, n), device=model.device, 
+			dtype=torch.float64)
+		for i, node in enumerate(model.nodes):
+			emissions[:, i] = node.distribution.log_probability(X.reshape(
+				-1, d)).reshape(n, k).T
+
+
+	return X, priors, emissions
+
+
+def _initialize_centroids(X, k, algorithm='first-k', random_state=None):
+	if isinstance(k, torch.Tensor):
+		k = k.item()
+		
+	if not isinstance(random_state, numpy.random.mtrand.RandomState):
+		random_state = numpy.random.RandomState(random_state)
+
+	if algorithm == 'first-k':
+		return _cast_as_tensor(torch.clone(X[:k]), dtype=torch.float32)
+
+	elif algorithm == 'random':
+		idxs = random_state.choice(len(X), size=k, replace=False)
+		return _cast_as_tensor(torch.clone(X[idxs]), dtype=torch.float32)
+
+	elif algorithm == 'submodular-facility-location':
+		selector = FacilityLocationSelection(k, random_state=random_state)
+		return _cast_as_tensor(selector.fit_transform(X), dtype=torch.float32)
+
+	elif algorithm == 'submodular-feature-based':
+		selector = FeatureBasedSelection(k, random_state=random_state)
+		return selector.fit_transform(X)
+
+	elif algorithm == 'KMeans':
+		selector = KMeans(k=k, random_state=random_state)
+		selector.fit(X)
+		return _cast_as_tensor(torch.clone(selector.centroids), 
+			dtypes=torch.float32) 
