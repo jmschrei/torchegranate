@@ -1,5 +1,7 @@
 <img src="https://github.com/jmschrei/pomegranate/blob/master/docs/logo/pomegranate-logo.png" width=300>
 
+![](https://github.com/jmschrei/torchegranate/actions/workflows/python-package.yml/badge.svg)
+
 > **Warning**
 > torchegranate is currently under rapid active development and the API has not yet been finalized. Major changes will be noted in the CHANGELOG. 
 
