@@ -65,8 +65,8 @@ class ConditionalCategorical(Distribution):
 
 		return logps
 
-	def marginal(self, dims=0):
-		return Categorical(self.probs.sum(axis=axis))
+	def marginal(self, dim=0):
+		return Categorical(self.probs.sum(dim=dim))
 
 	def summarize(self, X, sample_weight=None):
 		if self.frozen == True:
