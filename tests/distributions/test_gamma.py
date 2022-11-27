@@ -671,8 +671,8 @@ def test_summarize_raises(X, w, shapes, rates):
 
 
 def _test_fit_params(d, shapes, rates, thetas):
-	assert_array_almost_equal(d.shapes, shapes)
-	assert_array_almost_equal(d.rates, rates)
+	assert_array_almost_equal(d.shapes, shapes, 4)
+	assert_array_almost_equal(d.rates, rates, 4)
 
 	assert_array_almost_equal(d._w_sum, numpy.zeros(d.d))
 	assert_array_almost_equal(d._xw_sum, numpy.zeros(d.d))
