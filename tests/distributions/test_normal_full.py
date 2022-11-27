@@ -489,7 +489,7 @@ def test_summarize_weighted_2d(X):
 	assert_array_almost_equal(d._xxw_sum,
 		[[33.990997, 24.928   , 26.383999],
          [20.235998, 19.860996, 14.620998],
-         [22.9     , 16.351   , 23.618   ]])
+         [22.9     , 16.351   , 23.618   ]], 5)
 
 	d.summarize(X[4:], sample_weight=X[4:])
 	assert_array_almost_equal(d._w_sum, [17.1,  9.7, 10.6])

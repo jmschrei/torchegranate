@@ -623,7 +623,8 @@ def test_summarize_weighted_2d(X):
 	d.summarize(X, sample_weight=X)
 	assert_array_almost_equal(d._w_sum, [17.099998,  9.7     , 10.599999])
 	assert_array_almost_equal(d._xw_sum, [58.59    , 16.369999, 27.720001])
-	assert_array_almost_equal(d._logx_w_sum, [18.73867 ,  4.459686,  8.417439])
+	assert_array_almost_equal(d._logx_w_sum, [18.73867 ,  4.459686,  8.417439], 
+		4)
 
 
 def test_summarize_dtypes(X, w):
@@ -680,7 +681,7 @@ def _test_fit_params(d, shapes, rates, thetas):
 	assert_array_almost_equal(d._log_rates, numpy.log(rates))
 	assert_array_almost_equal(d._lgamma_shapes, torch.lgamma(torch.tensor(
 		shapes)))
-	assert_array_almost_equal(d._thetas, thetas)
+	assert_array_almost_equal(d._thetas, thetas, 4)
 
 
 def test_from_summaries(X, shapes, rates):
