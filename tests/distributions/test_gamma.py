@@ -678,9 +678,9 @@ def _test_fit_params(d, shapes, rates, thetas):
 	assert_array_almost_equal(d._xw_sum, numpy.zeros(d.d))
 	assert_array_almost_equal(d._logx_w_sum, numpy.zeros(d.d))
 
-	assert_array_almost_equal(d._log_rates, numpy.log(rates))
+	assert_array_almost_equal(d._log_rates, numpy.log(rates), 4)
 	assert_array_almost_equal(d._lgamma_shapes, torch.lgamma(torch.tensor(
-		shapes)))
+		shapes)), 4)
 	assert_array_almost_equal(d._thetas, thetas, 4)
 
 
