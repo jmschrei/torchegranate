@@ -185,7 +185,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		return torch.argmax(self.predict_log_proba(X, priors=priors), dim=-1)
 
 	def fit(self, X, sample_weight=None, priors=None):
-		logp = None
+		logp, last_logp = None, None
 		for i in range(self.max_iter):
 			start_time = time.time()
 			logp = self.summarize(X, sample_weight=sample_weight).sum()

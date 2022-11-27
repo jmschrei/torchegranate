@@ -281,9 +281,3 @@ def _initialize_centroids(X, k, algorithm='first-k', random_state=None):
 	elif algorithm == 'submodular-feature-based':
 		selector = FeatureBasedSelection(k, random_state=random_state)
 		return selector.fit_transform(X)
-
-	elif algorithm == 'KMeans':
-		selector = KMeans(k=k, random_state=random_state)
-		selector.fit(X)
-		return _cast_as_tensor(torch.clone(selector.centroids), 
-			dtypes=torch.float32) 

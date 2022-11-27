@@ -9,6 +9,7 @@ from .._utils import _check_parameter
 from .._utils import _reshape_weights
 
 from ._distribution import Distribution
+from .categorical import Categorical
 
 
 class JointCategorical(Distribution):

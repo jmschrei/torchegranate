@@ -1,0 +1,67 @@
+===============
+Release History
+===============
+
+
+Version 0.1.0
+==============
+
+Highlights
+----------
+
+	- This is the first public release of torchegranate and so this entry will
+	document changes versus the original pomegranate repository. 
+	- The biggest change is that the entire package has been rewritten in
+	PyTorch, with no Cython components, to installing and maintenance should
+	be easier.
+	- The `from_samples` method has removed in favor of the sklearn style
+	of not passing in parameters to the initialization and subsequently
+	calling `fit.`
+	- All inputs are meant to be 2D (or 3D for Markov chains and HMMs) numeric
+	values.
+	- Support for passing in symbols or defining distributions over arbitrary
+	symbols has been removed. Please manually encode your symbols or use the
+	appropriate sklearn function to do so.
+	- Models can be more tightly integrated with neural networks implemented
+	in PyTorch, e.g. a distribution can take the predicted outputs from a
+	model and use them to evaluate data.
+	- Sampling has not yet been added. 
+
+
+Distributions
+-------------
+
+	- Distribution names now omit the word "Distribution", e.g. 
+	"NormalDistribution" -> "Normal".
+	- "DiscreteDistribution" -> Categorical
+	- "JointProbabilityTable" -> JointCategorical
+	- "ConditionalProbabilityTable" -> ConditionalCategorical
+	- All distributions are now multivariate. Most are independent, in the sense
+	that each feature is evaluated separately. The log/probabilities returned
+	are evaluated under the entire feature set.
+	- Kernel densities have been removed for being annoying.
+	- Neural network wrappers have been removed due to the switch to PyTorch.
+	- ZeroInflated has been added as a wrapper for data that is a mixture of
+	zeroes and true signal
+	- StudentT has been added as a distribution
+	- DiracDelta has been added as a distribution
+
+
+NaiveBayes.pyx
+--------------
+	
+	- The NaiveBayes model has been removed, with BayesClassifier containing
+	its entire functionality.
+
+
+parallel.pyx
+------------
+
+	- These parallel functions have been deprecated because of the switch to
+	PyTorch.
+
+
+io.py
+-----
+	
+	- These functions have been deprecated because of the API switch.
