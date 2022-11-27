@@ -18,7 +18,7 @@ from .kmeans import KMeans
 
 class GeneralMixtureModel(BayesMixin, Distribution):
 	def __init__(self, distributions, priors=None, init='random', max_iter=10, 
-		tol=0.1, inertia=0.0, frozen=False, verbose=False):
+		tol=0.1, inertia=0.0, frozen=False, random_state=None, verbose=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "GeneralMixtureModel"
 
@@ -46,11 +46,13 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		self.init = init
 		self.max_iter = max_iter
 		self.tol = tol
+		self.random_state = random_state
 		self._reset_cache()
 
 	def _initialize(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
-		y_hat = KMeans(self.k, init=self.init, max_iter=3).fit_predict(X)
+		y_hat = KMeans(self.k, init=self.init, max_iter=3, 
+			random_state=self.random_state).fit_predict(X)
 
 		self.priors = torch.empty(self.k)
 

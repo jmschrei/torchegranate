@@ -29,8 +29,7 @@ class Normal(Distribution):
 		ndim = 1 if covariance_type in ('diag', 'sphere') else 2
 
 		self.means = _check_parameter(_cast_as_tensor(means), "means", ndim=1)
-		self.covs = _check_parameter(_cast_as_tensor(covs), "covs", 
-			min_value=0, ndim=ndim)
+		self.covs = _check_parameter(_cast_as_tensor(covs), "covs", ndim=ndim)
 
 		_check_shapes([self.means, self.covs], ["means", "covs"])
 

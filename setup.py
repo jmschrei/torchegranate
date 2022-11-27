@@ -5,7 +5,7 @@ setup(
 	version='0.0.1',
 	author='Jacob Schreiber',
 	author_email='jmschreiber91@gmail.com',
-	packages=['torchegranate'],
+	packages=['torchegranate', 'torchegranate.distributions'],
 	url='https://github.com/jmschrei/torchegranate',
 	license='LICENSE.txt',
 	description='A rewrite of pomegranate using PyTorch.',
