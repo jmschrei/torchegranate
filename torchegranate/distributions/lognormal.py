@@ -13,6 +13,8 @@ from ._distribution import Distribution
 from .normal import Normal
 
 class LogNormal(Normal):
+	"""Still under development."""
+	
 	def __init__(self, means=None, covs=None, covariance_type='diag', 
 		min_cov=0.0, frozen=False, inertia=0.0):
 		super(LogNormal, self).__init__(means=means, covs=covs, 

@@ -28,7 +28,7 @@ class Exponential(Distribution):
 
 	Parameters
 	----------
-	scales: torch.tensor or None, shape=(d,), optional
+	scales: list, numpy.ndarray, torch.Tensor or None, shape=(d,), optional
 		The rate parameters for each feature. Default is None.
 
 	inertia: float, (0, 1), optional
@@ -119,12 +119,33 @@ class Exponential(Distribution):
 		self._reset_cache()
 
 	def _initialize(self, d):
+		"""Initialize the probability distribution.
+
+		This method ie meant to only be called internally. It initializes the
+		parameters of the distribution and stores its dimensionality. For more
+		complex methods, this function will do more.
+
+
+		Parameters
+		----------
+		d: int
+			The dimensionality the distribution is being initialized to.
+		"""
+
 		self.scales = torch.zeros(d)
 
 		self._initialized = True
 		super()._initialize(d)
 
 	def _reset_cache(self):
+		"""Reset the internally stored statistics.
+
+		This method is meant to only be called internally. It resets the
+		stored statistics used to update the model parameters as well as
+		recalculates the cached values meant to speed up log probability
+		calculations.
+		"""
+
 		if self._initialized == False:
 			return
 
@@ -134,12 +155,55 @@ class Exponential(Distribution):
 		self._log_scales = torch.log(self.scales)
 
 	def log_probability(self, X):
+		"""Calculate the log probability of each example.
+
+		This method calculates the log probability of each example given the
+		parameters of the distribution. The examples must be given in a 2D
+		format. For an exponential distribution, the data must be non-negative.
+
+		Note: This differs from some other log probability calculation
+		functions, like those in torch.distributions, because it is not
+		returning the log probability of each feature independently, but rather
+		the total log probability of the entire example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to evaluate.
+
+
+		Returns
+		-------
+		logp: torch.Tensor, shape=(-1,)
+			The log probability of each example.
+		"""
+
 		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
 			ndim=2, shape=(-1, self.d))
 		
 		return torch.sum(-self._log_scales - (1. / self.scales) * X, dim=1)
 
 	def summarize(self, X, sample_weight=None):
+		"""Extract the sufficient statistics from a batch of data.
+
+		This method calculates the sufficient statistics from optionally
+		weighted data and adds them to the stored cache. The examples must be
+		given in a 2D format. Sample weights can either be provided as one
+		value per example or as a 2D matrix of weights for each feature in
+		each example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to summarize.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
+		"""
+
 		if self.frozen == True:
 			return
 
@@ -150,6 +214,16 @@ class Exponential(Distribution):
 		self._xw_sum += torch.sum(X * sample_weight, dim=0)
 
 	def from_summaries(self):
+		"""Update the model parameters given the extracted statistics.
+
+		This method uses calculated statistics from calls to the `summarize`
+		method to update the distribution parameters. Hyperparameters for the
+		update are passed in at initialization time.
+
+		Note: Internally, a call to `fit` is just a successive call to the
+		`summarize` method followed by the `from_summaries` method.
+		"""
+		
 		if self.frozen == True:
 			return
 

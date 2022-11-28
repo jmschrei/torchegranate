@@ -13,6 +13,8 @@ from ._distribution import Distribution
 from .categorical import Categorical
 
 class ConditionalCategorical(Distribution):
+	"""Still under development."""
+	
 	def __init__(self, probs=None, n_categories=None, pseudocount=0, inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "ConditionalCategorical"
