@@ -65,7 +65,7 @@ class Uniform(Distribution):
 	def _initialize(self, d):
 		"""Initialize the probability distribution.
 
-		This method ie meant to only be called internally. It initializes the
+		This method is meant to only be called internally. It initializes the
 		parameters of the distribution and stores its dimensionality. For more
 		complex methods, this function will do more.
 

@@ -44,8 +44,63 @@ def _convert_to_sparse_edges(nodes, edges, starts, ends, start, end):
 
 
 class _SparseHMM(Distribution):
+	"""A hidden Markov model with a sparse transition matrix.
+
+	A hidden Markov model is an extension of a mixture model to sequences by
+	including a transition matrix between the elements of the mixture. Each of
+	the algorithms for a hidden Markov model are essentially just a revision
+	of those algorithms to incorporate this transition matrix.
+
+	This object is a wrapper for a hidden Markov model with a sparse transition
+	matrix.
+
+	Separately, there are two ways to instantiate the hidden Markov model. The
+	first is by passing in a set of distributions, a dense transition matrix, 
+	and optionally start/end probabilities. The second is to initialize the
+	object without these and then to add edges using the `add_edge` method
+	and to add nodes using the `add_nodes` method. Importantly, the way that
+	you choose to initialize the hidden Markov model is independent of the
+	implementation that you end up choosing. If you pass in a dense transition
+	matrix, this will be converted to a sparse matrix with all the zeros
+	dropped if you choose `kind='sparse'`.
+
+
+	Parameters
+	----------
+	distributions: tuple or list
+		A set of distribution objects. These objects do not need to be
+		initialized, i.e., can be "Normal()". 
+
+	edges: numpy.ndarray, torch.Tensor, or None. shape=(k,k)
+		A dense transition matrix of probabilities for how each node or
+		distribution passed in connects to each other one. This can contain
+		many zeroes, and when paired with `kind='sparse'`, will drop those
+		elements from the matrix.
+
+	starts: list, numpy.ndarray, torch.Tensor, or None. shape=(k,)
+		The probability of starting at each node. If not provided, assumes
+		these probabilities are uniform.
+
+	ends: list, numpy.ndarray, torch.Tensor, or None. shape=(k,)
+		The probability of ending at each node. If not provided, assumes
+		these probabilities are uniform.
+
+	inertia: float, [0, 1], optional
+		Indicates the proportion of the update to apply to the parameters
+		during training. When the inertia is 0.0, the update is applied in
+		its entirety and the previous parameters are ignored. When the
+		inertia is 1.0, the update is entirely ignored and the previous
+		parameters are kept, equivalently to if the parameters were frozen.
+
+	frozen: bool, optional
+		Whether all the parameters associated with this distribution are frozen.
+		If you want to freeze individual pameters, or individual values in those
+		parameters, you must modify the `frozen` attribute of the tensor or
+		parameter directly. Default is False.
+	"""
+
 	def __init__(self, nodes, edges, start, end, starts=None, ends=None, 
-		batch_size=2048, max_iter=10, tol=0.1, inertia=0.0, frozen=False):
+		max_iter=10, tol=0.1, inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "_SparseHMM"
 
@@ -96,12 +151,15 @@ class _SparseHMM(Distribution):
 
 		self._reset_cache()
 
-
-	@property
-	def device(self):
-		return next(self.parameters()).device
-
 	def _reset_cache(self):
+		"""Reset the internally stored statistics.
+
+		This method is meant to only be called internally. It resets the
+		stored statistics used to update the model parameters as well as
+		recalculates the cached values meant to speed up log probability
+		calculations.
+		"""
+
 		self._xw_sum = _parameter(torch.zeros(self.n_edges, 
 			dtype=torch.float64))
 
@@ -112,10 +170,43 @@ class _SparseHMM(Distribution):
 			dtype=torch.float64))
 
 	def forward(self, X, priors=None, emissions=None):
+		"""Run the forward algorithm on some data.
+
+		Runs the forward algorithm on a batch of sequences. This is not to be
+		confused with a "forward pass" when talking about neural networks. The
+		forward algorithm is a dynamic programming algorithm that begins at the
+		start state and returns the probability, over all paths through the
+		model, that result in the alignment of symbol i to node j.
+
+		
+		Parameters
+		----------
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			A set of examples to evaluate. 		
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
+
+		Returns
+		-------
+		f: torch.Tensor, shape=(-1, length, self.k)
+			The log probabilities calculated by the forward algorithm.
+		"""
+
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		f = torch.zeros(k, n, self.n_nodes, device=self.device, dtype=torch.float64) + float("-inf")
+		f = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
 		f[0] = self.starts + emissions[0].T + priors[:, 0]
 
 		for i in range(1, k):
@@ -134,10 +225,44 @@ class _SparseHMM(Distribution):
 		return f
 
 	def backward(self, X, priors=None, emissions=None):
+		"""Run the backward algorithm on some data.
+
+		Runs the backward algorithm on a batch of sequences. This is not to be
+		confused with a "backward pass" when talking about neural networks. The
+		backward algorithm is a dynamic programming algorithm that begins at end
+		of the sequence and returns the probability, over all paths through the
+		model, that result in the alignment of symbol i to node j, working
+		backwards.
+
+		
+		Parameters
+		----------
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			A set of examples to evaluate. 		
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
+
+		Returns
+		-------
+		b: torch.Tensor, shape=(-1, length, self.k)
+			The log probabilities calculated by the backward algorithm.
+		"""
+
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		b = torch.zeros(k, n, self.n_nodes, device=self.device, dtype=torch.float64) + float("-inf")
+		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
 		b[-1] = self.ends
 
 		for i in range(k-2, -1, -1):
@@ -157,6 +282,64 @@ class _SparseHMM(Distribution):
 		return b
 
 	def forward_backward(self, X, priors=None, emissions=None):
+		"""Run the forward-backward algorithm on some data.
+
+		Runs the forward-backward algorithm on a batch of sequences. This
+		algorithm combines the best of the forward and the backward algorithm.
+		It combines the probability of starting at the beginning of the sequence
+		and working your way to each observation with the probability of
+		starting at the end of the sequence and working your way backward to it.
+
+		A number of statistics can be calculated using this information. These
+		statistics are powerful inference tools but are also used during the
+		Baum-Welch training process. 
+
+		
+		Parameters
+		----------
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			A set of examples to evaluate. 		
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
+
+		Returns
+		-------
+		transitions: torch.Tensor, shape=(-1, n_nodes, n_nodes) or (-1, n_edges)
+			The expected number of transitions across each edge that occur
+			for each example. The returned transitions follow the structure
+			of the transition matrix and so will be dense or sparse as
+			appropriate.
+
+		emissions: torch.Tensor, shape=(-1, length, n_nodes)
+			The posterior probabilities of each observation belonging to each
+			state given that one starts at the beginning of the sequence,
+			aligns observations across all paths to get to the current
+			observation, and then proceeds to align all remaining observations
+			until the end of the sequence.
+
+		starts: torch.Tensor, shape=(-1, n_nodes)
+			The probabilities of starting at each node given the 
+			forward-backward algorithm.
+
+		ends: torch.Tensor, shape=(-1, n_nodes)
+			The probabilities of ending at each node given the forward-backward
+			algorithm.
+
+		logp: torch.Tensor, shape=(-1,)
+			The log probabilities of each sequence given the model.
+		"""
+
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
@@ -182,6 +365,31 @@ class _SparseHMM(Distribution):
 		return expected_transitions, fb, starts, ends, logp
 
 	def summarize(self, X, sample_weight=None, priors=None):
+		"""Extract the sufficient statistics from a batch of data.
+
+		This method calculates the sufficient statistics from optionally
+		weighted data and adds them to the stored cache. The examples must be
+		given in a 2D format. Sample weights can either be provided as one
+		value per example or as a 2D matrix of weights for each feature in
+		each example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to summarize.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+		"""
+
 		transitions, emissions, starts, ends, logps = self.forward_backward(X, 
 			priors=priors)
 
@@ -198,6 +406,16 @@ class _SparseHMM(Distribution):
 		return logps
 
 	def from_summaries(self):
+		"""Update the model parameters given the extracted statistics.
+
+		This method uses calculated statistics from calls to the `summarize`
+		method to update the distribution parameters. Hyperparameters for the
+		update are passed in at initialization time.
+
+		Note: Internally, a call to `fit` is just a successive call to the
+		`summarize` method followed by the `from_summaries` method.
+		"""
+
 		for node in self.nodes:
 			node.distribution.from_summaries()
 

@@ -179,6 +179,22 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 
 
 def _check_shapes(parameters, names):
+	"""Check the shapes of a set of parameters.
+
+	This function takes in a set of parameters, as well as their names, and
+	checks that the shape is correct. It will raise an error if the lengths
+	of the parameters without the value of None are not equal.
+
+
+	Parameters
+	----------
+	parameters: list or tuple
+		A set of parameters, which can be None, to check the shape of.
+
+	names: list or tuple
+		A set of parameter names to refer to if something is wrong.
+	"""
+
 	n = len(parameters)
 
 	for i in range(n):
@@ -238,24 +254,16 @@ def _reshape_weights(X, sample_weight):
 
 def _check_hmm_inputs(model, X, priors, emissions):
 	X = _cast_as_tensor(X, dtype=torch.float64)
-
 	n, k, d = X.shape
-	#if X.device != model.device:
-
-	#	X = X.to(model.device)
 
 	if priors is None:
-		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
-	elif priors.device != model.device:
-		priors = priors.to(model.device)
+		priors = torch.zeros(1).expand(n, k, model.n_nodes)
 
 	if emissions is None:
-		emissions = torch.empty((k, model.n_nodes, n), device=model.device, 
-			dtype=torch.float64)
+		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float64)
 		for i, node in enumerate(model.nodes):
 			emissions[:, i] = node.distribution.log_probability(X.reshape(
 				-1, d)).reshape(n, k).T
-
 
 	return X, priors, emissions
 

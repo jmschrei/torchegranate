@@ -42,65 +42,6 @@ class Poisson(Distribution):
 		If you want to freeze individual pameters, or individual values in those
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
-
-
-	Examples
-	--------
-	>>> # Create a distribution with known parameters
-	>>> rates = torch.tensor([1.2, 0.4])
-	>>> X = torch.tensor([[0.3, 0.2], [0.8, 0.1]])
-	>>>
-	>>> d = Gamma(rates)
-	>>> d.log_probability(X)
-	tensor([-1.1740, -1.7340])
-	>>>
-	>>>
-	>>> # Fit a distribution to data
-	>>> n, d = 100, 10
-	>>> X = torch.exp(torch.randn(d) * 15)
-	>>> 
-	>>> d = Gamma().fit(X)
-	>>>
-	>>>
-	>>> # Fit a distribution using the summarize API
-	>>> n, d = 100, 10
-	>>> X = torch.exp(torch.randn(d) * 15)
-	>>> 
-	>>> d = Gamma()
-	>>> d.summarize(X[:50])
-	>>> d.summarize(X[50:])
-	>>> d.from_summaries()
-	>>>
-	>>>
-	>>> # As a loss function for a neural network
-	>>> class ToyNet(torch.nn.Module):
-	>>> 	def __init__(self, d):
-	>>>			super(ToyNet, self).__init__()
-	>>>			self.fc1 = torch.nn.Linear(d, 32)
-	>>>			self.shapes = torch.nn.Linear(32, d)
-	>>>			self.rates = torch.nn.Linear(32, d)
-	>>>			self.relu = torch.nn.ReLU()
-	>>>
-	>>>		def forward(self, X):
-	>>>			X = self.fc1(X)
-	>>>			X = self.relu(X)
-	>>>			shapes = self.shapes(X)
-	>>>			rates = self.rates(X)
-	>>>			return self.relu(shapes) + 0.01, self.relu(rates) + 0.01
-	>>>
-	>>> n, d = 1000
-	>>> X = torch.exp(torch.randn(n, d) * 15)
-	>>>
-	>>> model = ToyNet(d)
-	>>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-	>>>
-	>>> for i in range(100):
-	>>>		optimizer.zero_grad()
-	>>>
-	>>>		shapes, rates = model(X)
-	>>> 	loss = -Gamma(shapes, 2).log_probability(X).sum()
-	>>>		loss.backward()
-	>>>		optimizer.step()
 	"""
 
 
@@ -118,7 +59,7 @@ class Poisson(Distribution):
 	def _initialize(self, d):
 		"""Initialize the probability distribution.
 
-		This method ie meant to only be called internally. It initializes the
+		This method is meant to only be called internally. It initializes the
 		parameters of the distribution and stores its dimensionality. For more
 		complex methods, this function will do more.
 

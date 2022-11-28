@@ -43,68 +43,6 @@ class Exponential(Distribution):
 		frozen. If you want to freeze individual pameters, or individual values 
 		in those parameters, you must modify the `frozen` attribute of the 
 		tensor or parameter directly. Default is False.
-
-
-	Examples
-	--------
-	>>> # Create a distribution with known parameters
-	>>> scales = torch.tensor([1.2, 0.4])
-	>>> X = torch.tensor([[0.3, 0.2], [0.8, 0.1]])
-	>>>
-	>>> d = Exponential(scales)
-	>>> d.log_probability(X)
-	tensor([-1.1740, -1.7340])
-	>>>
-	>>>
-	>>> # Fit a distribution to data
-	>>> torch.manual_seed(0)
-	>>>
-	>>> X = torch.exp(torch.randn(100, 10) * 15)
-	>>> X.shape
-	torch.Size([100, 10])
-	>>> 
-	>>> d = Exponential()
-	>>> d.fit(X)
-	>>> d.scales
-	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
-		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
-	>>>
-	>>>
-	>>> # Fit a distribution using the summarize API
-	>>> d = Exponential()
-	>>> d.summarize(X[:50])
-	>>> d.summarize(X[50:])
-	>>> d.from_summaries()
-	>>> d.scales
-	tensor([2.5857e-13, 1.7420e-14, 6.8009e-21, 1.9106e-25, 5.1296e-19, 
-		2.4965e-15, 4.7202e-10, 2.5022e-24, 7.7177e-21, 6.0313e-21])
-	>>> 
-	>>>
-	>>>
-	>>> # As a loss function for a neural network
-	>>> class ToyNet(torch.nn.Module):
-	>>> 	def __init__(self, d):
-	>>>			super(ToyNet, self).__init__()
-	>>>			self.fc1 = torch.nn.Linear(d, 32)
-	>>>			self.scales = torch.nn.Linear(32, d)
-	>>>			self.relu = torch.nn.ReLU()
-	>>>
-	>>>		def forward(self, X):
-	>>>			X = self.fc1(X)
-	>>>			X = self.relu(X)
-	>>>			scales = self.scales(X)
-	>>>			return self.relu(scales) + 0.01
-	>>>
-	>>> model = ToyNet(10)
-	>>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-	>>>
-	>>> for i in range(100):
-	>>>		optimizer.zero_grad()
-	>>>
-	>>>		scales = model(X)
-	>>> 	loss = -Exponential(scales).log_probability(X).sum()
-	>>>		loss.backward()
-	>>>		optimizer.step()
 	"""
 
 	def __init__(self, scales=None, inertia=0.0, frozen=False):
@@ -121,7 +59,7 @@ class Exponential(Distribution):
 	def _initialize(self, d):
 		"""Initialize the probability distribution.
 
-		This method ie meant to only be called internally. It initializes the
+		This method is meant to only be called internally. It initializes the
 		parameters of the distribution and stores its dimensionality. For more
 		complex methods, this function will do more.
 
