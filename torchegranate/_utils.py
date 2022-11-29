@@ -40,7 +40,7 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 
 	if inertia == 0.0:
 		value[:] = new_value
-		
+
 	elif inertia < 1.0:
 		value_ = inertia*value + (1-inertia)*new_value
 
@@ -272,7 +272,7 @@ def _check_hmm_inputs(model, X, priors, emissions):
 		priors = torch.zeros(1).expand(n, k, model.n_nodes)
 
 	if emissions is None:
-		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float64)
+		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float32)
 		for i, node in enumerate(model.nodes):
 			emissions[:, i] = node.distribution.log_probability(X.reshape(
 				-1, d)).reshape(n, k).T

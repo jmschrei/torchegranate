@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='torchegranate',
-	version='0.0.1',
+	version='0.1.0',
 	author='Jacob Schreiber',
 	author_email='jmschreiber91@gmail.com',
 	packages=['torchegranate', 'torchegranate.distributions'],
@@ -13,6 +13,7 @@ setup(
 		'numpy >= 1.22.2', 
 		'scipy >= 1.6.2',
 		'scikit-learn >= 1.0.2',
-		'torch >= 1.9.0'
+		'torch >= 1.9.0',
+		'apricot-learn >= 0.6.1'
 	]
 )
