@@ -38,7 +38,19 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 	if hasattr(value, "frozen") and getattr(value, "frozen") == True:
 		return
 
-	value[:] = inertia*value + (1-inertia)*new_value
+	if inertia == 0.0:
+		value[:] = new_value
+		
+	elif inertia < 1.0:
+		value_ = inertia*value + (1-inertia)*new_value
+
+		inf_idx = torch.isinf(value)
+		inf_idx_new = torch.isinf(new_value)
+
+		value_[inf_idx] = value[inf_idx].type(value_.dtype)
+		value_[inf_idx_new] = new_value[inf_idx_new].type(value_.dtype)
+		
+		value[:] = value_
 
 
 def _check_parameter(parameter, name, min_value=None, max_value=None, 
@@ -253,7 +265,7 @@ def _reshape_weights(X, sample_weight):
 
 
 def _check_hmm_inputs(model, X, priors, emissions):
-	X = _cast_as_tensor(X, dtype=torch.float64)
+	X = _cast_as_tensor(X)
 	n, k, d = X.shape
 
 	if priors is None:

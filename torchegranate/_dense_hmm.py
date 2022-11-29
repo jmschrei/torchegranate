@@ -15,8 +15,6 @@ from ._base import Node
 
 NEGINF = float("-inf")
 
-_parameter = lambda x: torch.nn.Parameter(x, requires_grad=False)
-
 
 def _convert_to_dense_edges(nodes, edges, starts, ends, start, end):
 	n = len(nodes)
@@ -120,12 +118,17 @@ class _DenseHMM(Distribution):
 		self.start = start
 		self.end = end
 
-		self.nodes = torch.nn.ModuleList(nodes)
+		self.nodes = nodes
 		self.edges, self.starts, self.ends = _convert_to_dense_edges(nodes, 
 			edges, starts, ends, self.start, self.end)
 
 		self.n_nodes = len(nodes)
 		self.n_edges = len(edges)
+
+		if torch.isinf(self.starts).sum() == len(self.starts):
+			self.starts = torch.ones(self.n_nodes) / self.n_nodes
+		if torch.isinf(self.ends).sum() == len(self.ends):
+			self.ends = torch.ones(self.n_nodes) / self.n_nodes
 
 		self._reset_cache()
 
@@ -138,14 +141,14 @@ class _DenseHMM(Distribution):
 		calculations.
 		"""
 
-		self._xw_sum = _parameter(torch.zeros(self.n_nodes, self.n_nodes, 
-			dtype=torch.float64))
+		self._xw_sum = torch.zeros(self.n_nodes, self.n_nodes, 
+			dtype=torch.float64)
 
-		self._xw_starts_sum = _parameter(torch.zeros(self.n_nodes, 
-			dtype=torch.float64))
+		self._xw_starts_sum = torch.zeros(self.n_nodes, 
+			dtype=torch.float64)
 
-		self._xw_ends_sum = _parameter(torch.zeros(self.n_nodes, 
-			dtype=torch.float64))
+		self._xw_ends_sum = torch.zeros(self.n_nodes, 
+			dtype=torch.float64)
 
 	def forward(self, X, priors=None, emissions=None):
 		"""Run the forward algorithm on some data.

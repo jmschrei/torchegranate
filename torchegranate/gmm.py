@@ -76,7 +76,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		Whether to print the improvement and timings during training.
 	"""
 
-	def __init__(self, distributions, priors=None, init='random', max_iter=10, 
+	def __init__(self, distributions, priors=None, init='random', max_iter=1000, 
 		tol=0.1, inertia=0.0, frozen=False, random_state=None, verbose=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "GeneralMixtureModel"
@@ -108,7 +108,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		self.random_state = random_state
 		self._reset_cache()
 
-	def _initialize(self, X):
+	def _initialize(self, X, sample_weight=None):
 		"""Initialize the probability distribution.
 
 		This method is meant to only be called internally. It initializes the
@@ -120,18 +120,30 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		----------
 		X: list, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			The data to use to initialize the model.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+
+		if sample_weight is None:
+			sample_weight = torch.ones(1).expand(X.shape[0], 1)
+		else:
+			sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
+				"sample_weight", min_value=0.)
+
 		y_hat = KMeans(self.k, init=self.init, max_iter=3, 
-			random_state=self.random_state).fit_predict(X)
+			random_state=self.random_state).fit_predict(X,
+			sample_weight=sample_weight)
 
 		self.priors = torch.empty(self.k)
 
 		for i in range(self.k):
 			idx = y_hat == i
 
-			self.distributions[i].fit(X[idx])
+			self.distributions[i].fit(X[idx], sample_weight=sample_weight[idx])
 			self.priors[i] = idx.type(torch.float32).mean()
 
 		self._initialized = True
@@ -215,7 +227,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 
 		X = _cast_as_tensor(X)
 		if not self._initialized:
-			self._initialize(X)
+			self._initialize(X, sample_weight=sample_weight)
 
 		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 

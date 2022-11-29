@@ -139,7 +139,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 	"""
 
 	def __init__(self, nodes=None, edges=None, starts=None, ends=None, 
-		kind="sparse", init='random', max_iter=10, tol=0.1, 
+		kind="sparse", init='random', max_iter=1000, tol=0.1, 
 		inertia=0.0, frozen=False, random_state=None, verbose=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "HiddenMarkovModel"
@@ -185,7 +185,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		self.d = self.nodes[0].distribution.d if nodes is not None else None
 		self._model = None
-		self._initialized = False
+		self._initialized = all(n.distribution._initialized for n in self.nodes)
 
 	def bake(self):
 		"""Finalize the model after adding in edges manually.
@@ -210,7 +210,6 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		self.n_nodes = self._model.n_nodes
 		self.n_edges = self._model.n_edges
-		self._initialized = True
 
 	def _reset_cache(self):
 		"""Reset the internally stored statistics.
@@ -233,7 +232,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.starts = self._model.starts
 		self.ends = self._model.ends
 
-	def _initialize(self, X):
+	def _initialize(self, X, sample_weight=None):
 		"""Initialize the probability distribution.
 
 		This method is meant to only be called internally. It initializes the
@@ -245,16 +244,29 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		----------
 		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
 			The data to use to initialize the model.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
 		X = X.reshape(-1, X.shape[-1])
 
-		y_hat = KMeans(self.n_nodes, init=self.init, max_iter=3, 
-			random_state=self.random_state).fit_predict(X)
+		if sample_weight is None:
+			sample_weight = torch.ones(1).expand(X.shape[0], 1)
+		else:
+			sample_weight = _cast_as_tensor(sample_weight).reshape(-1, 1)
+			sample_weight = _check_parameter(sample_weight, "sample_weight", 
+				min_value=0., ndim=1, shape=(len(X),)).reshape(-1, 1)
+
+		y_hat = KMeans(self.n_nodes, init=self.init, max_iter=1, 
+			random_state=self.random_state).fit_predict(X, 
+			sample_weight=sample_weight)
 
 		for i in range(self.n_nodes):
-			self.nodes[i].distribution.fit(X[y_hat == i])
+			self.nodes[i].distribution.fit(X[y_hat == i], 
+				sample_weight=sample_weight[y_hat == i])
 
 		self._initialized = True
 		self._reset_cache()
@@ -454,9 +466,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			The log probability of each example.
 		"""
 
-
 		f = self.forward(X, priors=priors)
-		return torch.logsumexp(f[:, -1] + self.ends, dim=1)
+		return torch.logsumexp(f[:, -1] + self._model.ends, dim=1)
 
 	def predict_log_proba(self, X, priors=None):
 		"""Calculate the posterior probabilities for each example.
@@ -575,6 +586,9 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self
 		"""
 
+		if not self._initialized:
+			self._initialize(X, sample_weight=sample_weight)
+
 		logp, last_logp = None, None
 		for i in range(self.max_iter):
 			start_time = time.time()
@@ -589,7 +603,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 						improvement, duration))
 
 				if improvement < self.tol:
-					break
+					self._reset_cache()
+					return self
 
 			last_logp = logp
 			self.from_summaries()
@@ -640,6 +655,9 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight),
 				"sample_weight", min_value=0., ndim=1, 
 				shape=(len(X),)).reshape(-1, 1)
+
+		if not self._initialized:
+			self._initialize(X, sample_weight=sample_weight)
 
 		return self._model.summarize(X, sample_weight=sample_weight, 
 			priors=priors)

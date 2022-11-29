@@ -15,8 +15,6 @@ from ._base import Node
 
 NEGINF = float("-inf")
 
-_parameter = lambda x: torch.nn.Parameter(x, requires_grad=False)
-
 
 def _convert_to_sparse_edges(nodes, edges, starts, ends, start, end):
 	if len(edges[0]) == 3:
@@ -114,8 +112,8 @@ class _SparseHMM(Distribution):
 		self.n_nodes = len(self.nodes)
 		self.n_edges = len(self.edges)
 
-		self.starts = _parameter(torch.full((self.n_nodes,), NEGINF))
-		self.ends = _parameter(torch.full((self.n_nodes,), NEGINF)) 
+		self.starts = torch.full((self.n_nodes,), NEGINF)
+		self.ends = torch.full((self.n_nodes,), NEGINF) 
 
 		self._edge_idx_starts = torch.empty(self.n_edges, dtype=torch.int64)
 		self._edge_idx_ends = torch.empty(self.n_edges, dtype=torch.int64)
@@ -141,12 +139,16 @@ class _SparseHMM(Distribution):
 				self._edge_log_probabilities[idx] = math.log(probability)
 				idx += 1
 
+		if torch.isinf(self.starts).sum() == len(self.starts):
+			self.starts = torch.ones(self.n_nodes) / self.n_nodes
+		if torch.isinf(self.ends).sum() == len(self.ends):
+			self.ends = torch.ones(self.n_nodes) / self.n_nodes
+
 		self.nodes = torch.nn.ModuleList(self.nodes)
 
-		self._edge_idx_starts = _parameter(self._edge_idx_starts[:idx])
-		self._edge_idx_ends = _parameter(self._edge_idx_ends[:idx])
-		self._edge_log_probabilities = _parameter(
-			self._edge_log_probabilities[:idx])
+		self._edge_idx_starts = self._edge_idx_starts[:idx]
+		self._edge_idx_ends = self._edge_idx_ends[:idx]
+		self._edge_log_probabilities = self._edge_log_probabilities[:idx]
 		self.n_edges = idx
 
 		self._reset_cache()
@@ -160,14 +162,9 @@ class _SparseHMM(Distribution):
 		calculations.
 		"""
 
-		self._xw_sum = _parameter(torch.zeros(self.n_edges, 
-			dtype=torch.float64))
-
-		self._xw_starts_sum = _parameter(torch.zeros(self.n_nodes, 
-			dtype=torch.float64))
-
-		self._xw_ends_sum = _parameter(torch.zeros(self.n_nodes, 
-			dtype=torch.float64))
+		self._xw_sum = torch.zeros(self.n_edges, dtype=torch.float64)
+		self._xw_starts_sum = torch.zeros(self.n_nodes, dtype=torch.float64)
+		self._xw_ends_sum = torch.zeros(self.n_nodes, dtype=torch.float64)
 
 	def forward(self, X, priors=None, emissions=None):
 		"""Run the forward algorithm on some data.

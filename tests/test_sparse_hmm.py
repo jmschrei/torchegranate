@@ -203,7 +203,7 @@ def test_emission_matrix_raises(model, X):
 
 def test_log_probability(model, X):
 	logp = model.log_probability(X)
-	assert_array_almost_equal(logp, [-20.424 , -20.4042], 4)
+	assert_array_almost_equal(logp, [-22.8266, -22.8068], 4)
 
 
 def test_log_probability_raises(model, X):
