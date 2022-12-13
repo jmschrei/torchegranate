@@ -282,7 +282,7 @@ def _check_hmm_inputs(model, X, priors, emissions):
 		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
 
 	if emissions is None:
-		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float64, requires_grad=False, device=model.device)
+		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float32, requires_grad=False, device=model.device)
 		for i, node in enumerate(model.nodes):
 			emissions[:, i] = node.distribution.log_probability(X.reshape(
 				-1, d)).reshape(n, k).T

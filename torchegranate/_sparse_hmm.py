@@ -121,7 +121,7 @@ class _SparseHMM(Distribution):
 		_edge_idx_ends = _cast_as_parameter(torch.empty(self.n_edges, 
 			dtype=torch.int64))
 		_edge_log_probs = _cast_as_parameter(torch.empty(self.n_edges, 
-			dtype=torch.float64))
+			dtype=torch.float32))
 
 		idx = 0
 		for ni, nj, probability in self.edges:
@@ -166,13 +166,13 @@ class _SparseHMM(Distribution):
 		"""
 
 		self.register_buffer("_xw_sum", torch.zeros(self.n_edges, 
-			dtype=torch.float64, device=self.device))
+			dtype=torch.float32, device=self.device))
 
 		self.register_buffer("_xw_starts_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float64, device=self.device))
+			dtype=torch.float32, device=self.device))
 
 		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float64, device=self.device))
+			dtype=torch.float32, device=self.device))
 
 	def forward(self, X, priors=None, emissions=None):
 		"""Run the forward algorithm on some data.
@@ -211,7 +211,7 @@ class _SparseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		f = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float64, 
+		f = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float32, 
 			device=self.device)
 		f[0] = self.starts + emissions[0].T + priors[:, 0]
 
@@ -268,7 +268,7 @@ class _SparseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		b = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float64,
+		b = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float32,
 			device=self.device)
 		b[-1] = self.ends
 

@@ -17,24 +17,16 @@ from ._base import Node
 NEGINF = float("-inf")
 inf = float("inf")
 
-@torch.jit.script
-def _forward(f, alphas, t):
-	k = f.shape[0]
-	for i in range(1, k):
-		alphas[i-1] = torch.sum(f[i-1])#, dim=['1'], keepdims=True)
-		f[i-1] /= alphas[i-1]
-		f[i] *= torch.mm(f[i-1], t)
-
 def _convert_to_dense_edges(nodes, edges, starts, ends, start, end):
 	n = len(nodes)
 
 	if len(edges[0]) == n:
 		edges = _cast_as_parameter(torch.log(_cast_as_tensor(edges, 
-			dtype=torch.float64)))
+			dtype=torch.float32)))
 		starts = _cast_as_parameter(torch.log(_cast_as_tensor(starts,
-			dtype=torch.float64)))
+			dtype=torch.float32)))
 		ends = _cast_as_parameter(torch.log(_cast_as_tensor(ends,
-			dtype=torch.float64)))
+			dtype=torch.float32)))
 		return edges, starts, ends
 
 	else:
@@ -155,13 +147,13 @@ class _DenseHMM(Distribution):
 		"""
 
 		self.register_buffer("_xw_sum", torch.zeros(self.n_nodes, self.n_nodes, 
-			dtype=torch.float64, requires_grad=False, device=self.device))
+			dtype=torch.float32, requires_grad=False, device=self.device))
 
 		self.register_buffer("_xw_starts_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float64, requires_grad=False, device=self.device))
+			dtype=torch.float32, requires_grad=False, device=self.device))
 
 		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float64, requires_grad=False, device=self.device))
+			dtype=torch.float32, requires_grad=False, device=self.device))
 
 
 	@torch.inference_mode()
@@ -204,19 +196,6 @@ class _DenseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		'''
-		t = torch.exp(self.edges)
-		f = torch.clone(emissions.permute(0, 2, 1)).contiguous()
-		f[0] += self.starts + priors[:, 0]
-
-		f = torch.exp(f)
-		alphas = torch.ones(k)
-
-		_forward(f, alphas, t)
-
-		f = torch.log(f) + torch.cumsum(torch.log(alphas.reshape(-1, 1, 1)), 0)
-		'''
-
 		t_max = self.edges.max()
 		t = torch.exp(self.edges - t_max)
 
@@ -226,18 +205,10 @@ class _DenseHMM(Distribution):
 		f[1:] += t_max
 
 		for i in range(1, k):
-			#tic = time.time()
 			p_max = torch.max(f[i-1], dim=1, keepdims=True).values
-			#a += time.time() - tic
-
-			#tic = time.time()
 			p = torch.exp(f[i-1] - p_max)
-			#b += time.time() - tic
-
-			#tic = time.time()
 			f[i] += torch.log(torch.matmul(p, t)) + p_max
-			#c += time.time() - tic
-	
+
 		f = f.permute(1, 0, 2)
 		return f
 
@@ -280,7 +251,7 @@ class _DenseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float64, device=self.device) + float("-inf")
+		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float32, device=self.device) + float("-inf")
 		b[-1] = self.ends
 
 		t_max = self.edges.max()
@@ -356,23 +327,12 @@ class _DenseHMM(Distribution):
 			The log probabilities of each sequence given the model.
 		"""
 
-		import time
-		#print("aaaa")
-
-		#tic = time.time()
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, None)
 		n, k, d = X.shape
-		#print(time.time() - tic, "e")
 
-		#tic = time.time()
 		f = self.forward(X, priors=priors, emissions=emissions)
-		#print(time.time() - tic, "f")
-
-		#tic = time.time()
 		b = self.backward(X, priors=priors, emissions=emissions)
-		#print(time.time() - tic, "b")
 
-		tic = time.time()
 		logp = torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
 		f_ = f[:, :-1].unsqueeze(-1)
@@ -391,7 +351,6 @@ class _DenseHMM(Distribution):
 
 		fb = f + b
 		fb = (fb - torch.logsumexp(fb, dim=2).reshape(len(X), -1, 1))
-		#print(time.time() - tic)
 		return t, fb, starts, ends, logp
 
 	def summarize(self, X, sample_weight=None, priors=None):

@@ -299,7 +299,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		n, k, _ = X.shape
 		X = X.reshape(-1, self.d)
 
-		e = torch.empty((k, self.n_nodes, n), dtype=torch.float64)
+		e = torch.empty((k, self.n_nodes, n), dtype=torch.float32)
 		for i, node in enumerate(self.nodes):
 			e[:, i] = node.distribution.log_probability(X).reshape(n, k).T
 
