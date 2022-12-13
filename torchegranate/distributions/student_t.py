@@ -5,6 +5,7 @@ import math
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 
@@ -67,13 +68,18 @@ class StudentT(Normal):
 		min_cov=None, inertia=0.0, frozen=False):
 		self.name = "StudentT"
 
-		self.dofs = _check_parameter(_cast_as_tensor(dofs), "dofs", 
-			min_value=1, ndim=0, dtypes=(torch.int32, torch.int64))
-		self._lgamma_dofsp1 = torch.lgamma((self.dofs + 1) / 2.0)
-		self._lgamma_dofs = torch.lgamma(self.dofs / 2.0)
+		dofs = _check_parameter(_cast_as_tensor(dofs), "dofs", min_value=1,
+			ndim=0, dtypes=(torch.int32, torch.int64))
+		self.dofs = dofs
 
 		super().__init__(means=means, covs=covs, min_cov=min_cov,
 			covariance_type=covariance_type, inertia=inertia, frozen=frozen)
+
+		del self.dofs
+
+		self.register_buffer("dofs", _cast_as_tensor(dofs))
+		self.register_buffer("_lgamma_dofsp1", torch.lgamma((dofs + 1) / 2.0))
+		self.register_buffer("_lgamma_dofs", torch.lgamma(dofs / 2.0))
 
 	def _reset_cache(self):
 		"""Reset the internally stored statistics.
@@ -88,8 +94,8 @@ class StudentT(Normal):
 		if self._initialized == False:
 			return
 
-		self._log_sqrt_dofs_pi_cov = torch.log(torch.sqrt(self.dofs * math.pi * 
-			self.covs))
+		self.register_buffer("_log_sqrt_dofs_pi_cov", torch.log(torch.sqrt(
+			self.dofs * math.pi * self.covs)))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

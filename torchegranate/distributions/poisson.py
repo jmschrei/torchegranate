@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 
@@ -49,7 +50,7 @@ class Poisson(Distribution):
 		super().__init__(inertia, frozen)
 		self.name = "Poisson"
 
-		self.lambdas = _check_parameter(_cast_as_tensor(lambdas), "lambdas", 
+		self.lambdas = _check_parameter(_cast_as_parameter(lambdas), "lambdas", 
 			min_value=0, ndim=1)
 
 		self._initialized = lambdas is not None
@@ -70,7 +71,7 @@ class Poisson(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.lambdas = torch.zeros(d)
+		self.lambdas = _cast_as_parameter(torch.zeros(d, device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -87,10 +88,10 @@ class Poisson(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d)
-		self._xw_sum = torch.zeros(self.d)
+		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
-		self._log_lambdas = torch.log(self.lambdas)
+		self.register_buffer("_log_lambdas", torch.log(self.lambdas))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
@@ -120,7 +121,7 @@ class Poisson(Distribution):
 
 		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0, 
 			ndim=2, shape=(-1, self.d))
-		
+
 		return torch.sum(X * self._log_lambdas - self.lambdas - 
 			torch.lgamma(X+1), dim=-1)
 

@@ -3,6 +3,7 @@ import numpy
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _check_hmm_inputs
@@ -14,22 +15,32 @@ from ._base import GraphMixin
 from ._base import Node
 
 NEGINF = float("-inf")
+inf = float("inf")
 
+@torch.jit.script
+def _forward(f, alphas, t):
+	k = f.shape[0]
+	for i in range(1, k):
+		alphas[i-1] = torch.sum(f[i-1])#, dim=['1'], keepdims=True)
+		f[i-1] /= alphas[i-1]
+		f[i] *= torch.mm(f[i-1], t)
 
 def _convert_to_dense_edges(nodes, edges, starts, ends, start, end):
 	n = len(nodes)
 
 	if len(edges[0]) == n:
-		edges = torch.tensor(edges, dtype=torch.float64)
-		starts = torch.tensor(starts, dtype=torch.float64)
-		ends = torch.tensor(ends, dtype=torch.float64)
-		return torch.log(edges), torch.log(starts), torch.log(ends)
+		edges = _cast_as_parameter(torch.log(_cast_as_tensor(edges, 
+			dtype=torch.float64)))
+		starts = _cast_as_parameter(torch.log(_cast_as_tensor(starts,
+			dtype=torch.float64)))
+		ends = _cast_as_parameter(torch.log(_cast_as_tensor(ends,
+			dtype=torch.float64)))
+		return edges, starts, ends
 
 	else:
-		starts = torch.zeros(n, dtype=torch.float64) + NEGINF
-		ends = torch.zeros(n, dtype=torch.float64) + NEGINF
-		_edges = torch.zeros(n, n, dtype=torch.float64) + NEGINF
-
+		starts = _cast_as_parameter(torch.full(n, -inf))
+		ends = _cast_as_parameter(torch.full(n, -inf))
+		_edges = _cast_as_parameter(torch.full((n, n), -inf))
 		for ni, nj, probability in edges:
 			if ni == start:
 				j = nodes.index(nj)
@@ -118,7 +129,7 @@ class _DenseHMM(Distribution):
 		self.start = start
 		self.end = end
 
-		self.nodes = nodes
+		self.nodes = torch.nn.ModuleList(nodes)
 		self.edges, self.starts, self.ends = _convert_to_dense_edges(nodes, 
 			edges, starts, ends, self.start, self.end)
 
@@ -126,9 +137,11 @@ class _DenseHMM(Distribution):
 		self.n_edges = len(edges)
 
 		if torch.isinf(self.starts).sum() == len(self.starts):
-			self.starts = torch.ones(self.n_nodes) / self.n_nodes
+			self.starts = _cast_as_parameter(torch.ones(self.n_nodes) 
+				/ self.n_nodes)
 		if torch.isinf(self.ends).sum() == len(self.ends):
-			self.ends = torch.ones(self.n_nodes) / self.n_nodes
+			self.ends = _cast_as_parameter(torch.ones(self.n_nodes) 
+				/ self.n_nodes)
 
 		self._reset_cache()
 
@@ -141,15 +154,17 @@ class _DenseHMM(Distribution):
 		calculations.
 		"""
 
-		self._xw_sum = torch.zeros(self.n_nodes, self.n_nodes, 
-			dtype=torch.float64)
+		self.register_buffer("_xw_sum", torch.zeros(self.n_nodes, self.n_nodes, 
+			dtype=torch.float64, requires_grad=False, device=self.device))
 
-		self._xw_starts_sum = torch.zeros(self.n_nodes, 
-			dtype=torch.float64)
+		self.register_buffer("_xw_starts_sum", torch.zeros(self.n_nodes, 
+			dtype=torch.float64, requires_grad=False, device=self.device))
 
-		self._xw_ends_sum = torch.zeros(self.n_nodes, 
-			dtype=torch.float64)
+		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
+			dtype=torch.float64, requires_grad=False, device=self.device))
 
+
+	@torch.inference_mode()
 	def forward(self, X, priors=None, emissions=None):
 		"""Run the forward algorithm on some data.
 
@@ -184,25 +199,49 @@ class _DenseHMM(Distribution):
 			The log probabilities calculated by the forward algorithm.
 		"""
 
+		import time
+
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		f = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
-		f[0] = self.starts + emissions[0].T + priors[:, 0]
+		'''
+		t = torch.exp(self.edges)
+		f = torch.clone(emissions.permute(0, 2, 1)).contiguous()
+		f[0] += self.starts + priors[:, 0]
+
+		f = torch.exp(f)
+		alphas = torch.ones(k)
+
+		_forward(f, alphas, t)
+
+		f = torch.log(f) + torch.cumsum(torch.log(alphas.reshape(-1, 1, 1)), 0)
+		'''
 
 		t_max = self.edges.max()
 		t = torch.exp(self.edges - t_max)
 
+		f = torch.clone(emissions.permute(0, 2, 1)).contiguous()
+
+		f[0] += self.starts + priors[:, 0]
+		f[1:] += t_max
 
 		for i in range(1, k):
+			#tic = time.time()
 			p_max = torch.max(f[i-1], dim=1, keepdims=True).values
+			#a += time.time() - tic
+
+			#tic = time.time()
 			p = torch.exp(f[i-1] - p_max)
+			#b += time.time() - tic
 
-			f[i] = torch.log(torch.matmul(p, t)) + t_max + p_max + emissions[i].T
-
+			#tic = time.time()
+			f[i] += torch.log(torch.matmul(p, t)) + p_max
+			#c += time.time() - tic
+	
 		f = f.permute(1, 0, 2)
 		return f
 
+	@torch.inference_mode()
 	def backward(self, X, priors=None, emissions=None):
 		"""Run the backward algorithm on some data.
 
@@ -241,7 +280,7 @@ class _DenseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
+		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float64, device=self.device) + float("-inf")
 		b[-1] = self.ends
 
 		t_max = self.edges.max()
@@ -257,6 +296,7 @@ class _DenseHMM(Distribution):
 		b = b.permute(1, 0, 2)
 		return b
 
+	@torch.inference_mode()
 	def forward_backward(self, X, priors=None, emissions=None):
 		"""Run the forward-backward algorithm on some data.
 
@@ -316,12 +356,23 @@ class _DenseHMM(Distribution):
 			The log probabilities of each sequence given the model.
 		"""
 
+		import time
+		#print("aaaa")
+
+		#tic = time.time()
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, None)
 		n, k, d = X.shape
+		#print(time.time() - tic, "e")
 
+		#tic = time.time()
 		f = self.forward(X, priors=priors, emissions=emissions)
-		b = self.backward(X, priors=priors, emissions=emissions)
+		#print(time.time() - tic, "f")
 
+		#tic = time.time()
+		b = self.backward(X, priors=priors, emissions=emissions)
+		#print(time.time() - tic, "b")
+
+		tic = time.time()
 		logp = torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
 		f_ = f[:, :-1].unsqueeze(-1)
@@ -340,6 +391,7 @@ class _DenseHMM(Distribution):
 
 		fb = f + b
 		fb = (fb - torch.logsumexp(fb, dim=2).reshape(len(X), -1, 1))
+		#print(time.time() - tic)
 		return t, fb, starts, ends, logp
 
 	def summarize(self, X, sample_weight=None, priors=None):

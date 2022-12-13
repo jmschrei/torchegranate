@@ -225,7 +225,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			node.distribution._reset_cache()
 
 		if self.kind == 'sparse':
-			self.edges = self._model._edge_log_probabilities
+			self.edges = self._model._edge_log_probs
 		else:
 			self.edges = self._model.edges
 
@@ -650,7 +650,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
 		
 		if sample_weight is None:
-			sample_weight = torch.ones(1).expand(X.shape[0], 1)
+			sample_weight = torch.ones(1, device=self.device).expand(
+				X.shape[0], 1)
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight),
 				"sample_weight", min_value=0., ndim=1, 

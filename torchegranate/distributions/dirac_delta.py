@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 
@@ -49,7 +50,7 @@ class DiracDelta(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "DiracDelta"
 
-		self.alphas = _check_parameter(_cast_as_tensor(alphas), "alphas", 
+		self.alphas = _check_parameter(_cast_as_parameter(alphas), "alphas", 
 			min_value=0.0, ndim=1)
 
 		self._initialized = alphas is not None
@@ -70,7 +71,7 @@ class DiracDelta(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.alphas = torch.ones(d)
+		self.alphas = _cast_as_parameter(torch.ones(d, device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -87,7 +88,7 @@ class DiracDelta(Distribution):
 		if self._initialized == False:
 			return
 
-		self._log_alphas = torch.log(self.alphas)
+		self.register_buffer("_log_alphas", torch.log(self.alphas))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

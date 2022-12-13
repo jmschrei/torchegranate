@@ -31,6 +31,16 @@ def _cast_as_tensor(value, dtype=None):
 			return torch.tensor(value, dtype=dtype)
 
 
+def _cast_as_parameter(value, dtype=None, requires_grad=False):
+	"""Set the parameter.""" 
+
+	if value is None:
+		return None
+
+	value = _cast_as_tensor(value, dtype=dtype)
+	return torch.nn.Parameter(value, requires_grad=requires_grad)
+
+
 def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 	"""Update a parameters unles.
 	"""
@@ -39,7 +49,7 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 		return
 
 	if inertia == 0.0:
-		value[:] = new_value
+		value[:] = _cast_as_parameter(new_value)
 
 	elif inertia < 1.0:
 		value_ = inertia*value + (1-inertia)*new_value
@@ -50,7 +60,7 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 		value_[inf_idx] = value[inf_idx].type(value_.dtype)
 		value_[inf_idx_new] = new_value[inf_idx_new].type(value_.dtype)
 		
-		value[:] = value_
+		value[:] = _cast_as_parameter(value_)
 
 
 def _check_parameter(parameter, name, min_value=None, max_value=None, 
@@ -223,7 +233,7 @@ def _check_shapes(parameters, names):
 					"shape.".format(names[i], names[j]))
 
 
-def _reshape_weights(X, sample_weight):
+def _reshape_weights(X, sample_weight, device='cpu'):
 	"""Handle a sample weight tensor by creating and reshaping it.
 
 	This function will take any weight input, including None, 1D weights, and
@@ -251,7 +261,7 @@ def _reshape_weights(X, sample_weight):
 	"""
 
 	if sample_weight is None:
-		return torch.ones(1).expand_as(X)
+		return torch.ones(1, device=device).expand_as(X)
 	
 	if len(sample_weight.shape) == 1: 
 		sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[1])
@@ -269,10 +279,10 @@ def _check_hmm_inputs(model, X, priors, emissions):
 	n, k, d = X.shape
 
 	if priors is None:
-		priors = torch.zeros(1).expand(n, k, model.n_nodes)
+		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
 
 	if emissions is None:
-		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float32)
+		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float64, requires_grad=False, device=model.device)
 		for i, node in enumerate(model.nodes):
 			emissions[:, i] = node.distribution.log_probability(X.reshape(
 				-1, d)).reshape(n, k).T

@@ -2,9 +2,11 @@
 # Author: Jacob Schreiber <jmschreiber91@gmail.com>
 
 import time
+import numpy
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
@@ -81,10 +83,11 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "GeneralMixtureModel"
 
-		self.distributions = _check_parameter(distributions, "distributions",
-			dtypes=(list, tuple))
+		_check_parameter(distributions, "distributions", dtypes=(list, tuple, 
+			numpy.array, torch.nn.ModuleList))
+		self.distributions = torch.nn.ModuleList(distributions)
 
-		self.priors = _check_parameter(_cast_as_tensor(priors), "priors", 
+		self.priors = _check_parameter(_cast_as_parameter(priors), "priors", 
 			min_value=0, max_value=1, ndim=1, value_sum=1.0, 
 			shape=(len(distributions),))
 
@@ -96,7 +99,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 			self._initialized = True
 			self.d = distributions[0].d
 			if self.priors is None:
-				self.priors = torch.ones(self.k) / self.k
+				self.priors = _cast_as_parameter(torch.ones(self.k) / self.k)
 
 		else:
 			self._initialized = False
@@ -129,16 +132,22 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
 
 		if sample_weight is None:
-			sample_weight = torch.ones(1).expand(X.shape[0], 1)
+			sample_weight = torch.ones(1, device=self.device).expand(
+				X.shape[0], 1)
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
 				"sample_weight", min_value=0.)
 
-		y_hat = KMeans(self.k, init=self.init, max_iter=3, 
-			random_state=self.random_state).fit_predict(X,
-			sample_weight=sample_weight)
+		model = KMeans(self.k, init=self.init, max_iter=3, 
+			random_state=self.random_state)
 
-		self.priors = torch.empty(self.k)
+		if self.device != model.device:
+			model.to(self.device)
+
+		y_hat = model.fit_predict(X, sample_weight=sample_weight)
+
+		self.priors = _cast_as_parameter(torch.empty(self.k, 
+			device=self.device))
 
 		for i in range(self.k):
 			idx = y_hat == i
@@ -232,7 +241,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32))
+			dtype=torch.float32), device=self.device)
 
 		e = self._emission_matrix(X)
 		logp = torch.logsumexp(e, dim=1, keepdims=True)

@@ -1,9 +1,11 @@
 # BayesClassifier.py
 # Author: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import numpy
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
@@ -65,10 +67,11 @@ class BayesClassifier(BayesMixin, Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "BayesClassifier"
 
-		self.distributions = _check_parameter(distributions, "distributions",
-			dtypes=(list, tuple))
+		_check_parameter(distributions, "distributions", dtypes=(list, tuple, 
+			numpy.array, torch.nn.ModuleList))
+		self.distributions = torch.nn.ModuleList(distributions)
 
-		self.priors = _check_parameter(_cast_as_tensor(priors), "priors", 
+		self.priors = _check_parameter(_cast_as_parameter(priors), "priors", 
 			min_value=0, max_value=1, ndim=1, value_sum=1.0, 
 			shape=(len(distributions),))
 
@@ -78,7 +81,7 @@ class BayesClassifier(BayesMixin, Distribution):
 			self._initialized = True
 			self.d = distributions[0].d
 			if self.priors is None:
-				self.priors = torch.ones(self.k) / self.k
+				self.priors = _cast_as_parameter(torch.ones(self.k) / self.k)
 
 		else:
 			self._initialized = False
@@ -100,7 +103,7 @@ class BayesClassifier(BayesMixin, Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.priors = torch.ones(self.k) / self.k
+		self.priors = _cast_as_parameter(torch.ones(self.k) / self.k)
 
 		self._initialized = True
 		super()._initialize(d)

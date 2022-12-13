@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import _check_shapes
@@ -76,8 +77,10 @@ class Normal(Distribution):
 
 		ndim = 1 if covariance_type in ('diag', 'sphere') else 2
 
-		self.means = _check_parameter(_cast_as_tensor(means), "means", ndim=1)
-		self.covs = _check_parameter(_cast_as_tensor(covs), "covs", ndim=ndim)
+		self.means = _check_parameter(_cast_as_parameter(means), "means", 
+			ndim=1)
+		self.covs = _check_parameter(_cast_as_parameter(covs), "covs", 
+			ndim=ndim)
 
 		_check_shapes([self.means, self.covs], ["means", "covs"])
 
@@ -102,14 +105,15 @@ class Normal(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.means = torch.zeros(d)
+		self.means = _cast_as_parameter(torch.zeros(d, device=self.device))
 		
 		if self.covariance_type == 'full':
-			self.covs = torch.zeros(d, d)
+			self.covs = _cast_as_parameter(torch.zeros(d, d, 
+				device=self.device))
 		elif self.covariance_type == 'diag':
-			self.covs = torch.zeros(d)
+			self.covs = _cast_as_parameter(torch.zeros(d, device=self.device))
 		elif self.covariance_type == 'sphere':
-			self.covs = torch.tensor(0)
+			self.covs = _cast_as_parameter(torch.tensor(0, device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -126,27 +130,37 @@ class Normal(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d)
-		self._xw_sum = torch.zeros(self.d)
+		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
 		if self.covariance_type == 'full':
-			self._xxw_sum = torch.zeros(self.d, self.d)
-	
+			self.register_buffer("_xxw_sum", torch.zeros(self.d, self.d, 
+				device=self.device))
+
 			if self.covs.sum() > 0.0:
-				chol = torch.linalg.cholesky(self.covs, upper=False)
-				self._inv_cov = torch.linalg.solve_triangular(chol, torch.eye(
+				chol = torch.linalg.cholesky(self.covs)
+				_inv_cov = torch.linalg.solve_triangular(chol, torch.eye(
 					len(self.covs)), upper=False).T
-				self._inv_cov_dot_mu = torch.matmul(self.means, self._inv_cov)
-				self._log_det = -0.5 * torch.linalg.slogdet(self.covs)[1]
-				self._theta = self._log_det - 0.5 * (self.d * LOG_2_PI)
+				_inv_cov_dot_mu = torch.matmul(self.means, _inv_cov)
+				_log_det = -0.5 * torch.linalg.slogdet(self.covs)[1]
+				_theta = _log_det - 0.5 * (self.d * LOG_2_PI)
+
+				self.register_buffer("_inv_cov", _inv_cov)
+				self.register_buffer("_inv_cov_dot_mu", _inv_cov_dot_mu)
+				self.register_buffer("_log_det", _log_det)
+				self.register_buffer("_theta", _theta)
 
 		elif self.covariance_type in ('diag', 'sphere'):
-			self._xxw_sum = torch.zeros(self.d)
+			self.register_buffer("_xxw_sum", torch.zeros(self.d, 
+				device=self.device))
 
 			if self.covs.sum() > 0.0:
-				self._log_sigma_sqrt_2pi = -torch.log(torch.sqrt(self.covs) * 
+				_log_sigma_sqrt_2pi = -torch.log(torch.sqrt(self.covs) * 
 					SQRT_2_PI)
-				self._inv_two_sigma = 1. / (2 * self.covs)
+				_inv_two_sigma = 1. / (2 * self.covs)
+
+				self.register_buffer("_log_sigma_sqrt_2pi", _log_sigma_sqrt_2pi)
+				self.register_buffer("_inv_two_sigma", _inv_two_sigma)
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

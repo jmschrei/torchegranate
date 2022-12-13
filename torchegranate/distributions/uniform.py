@@ -4,11 +4,14 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import _check_shapes
 
 from ._distribution import Distribution
+
+inf = float("inf")
 
 
 class Uniform(Distribution):
@@ -53,8 +56,8 @@ class Uniform(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Uniform"
 
-		self.mins = _check_parameter(_cast_as_tensor(mins), "mins", ndim=1)
-		self.maxs = _check_parameter(_cast_as_tensor(maxs), "maxs", ndim=1)
+		self.mins = _check_parameter(_cast_as_parameter(mins), "mins", ndim=1)
+		self.maxs = _check_parameter(_cast_as_parameter(maxs), "maxs", ndim=1)
 
 		_check_shapes([self.mins, self.maxs], ["mins", "maxs"])
 
@@ -76,8 +79,8 @@ class Uniform(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.mins = torch.zeros(d)
-		self.maxs = torch.zeros(d)
+		self.mins = _cast_as_parameter(torch.zeros(d, device=self.device))
+		self.maxs = _cast_as_parameter(torch.zeros(d, device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -94,9 +97,11 @@ class Uniform(Distribution):
 		if self._initialized == False:
 			return
 
-		self._x_mins = torch.zeros(self.d) + float("inf")
-		self._x_maxs = torch.zeros(self.d) - float("inf")
-		self._logps = -torch.log(self.maxs - self.mins)
+		self.register_buffer("_x_mins", torch.full((self.d,), inf, 
+			device=self.device))
+		self.register_buffer("_x_maxs", torch.full((self.d,), -inf,
+			device=self.device))
+		self.register_buffer("_logps", -torch.log(self.maxs - self.mins))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

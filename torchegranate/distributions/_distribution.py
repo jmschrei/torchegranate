@@ -5,6 +5,7 @@ import torch
 
 from .._utils import _cast_as_tensor
 from .._utils import _update_parameter
+from .._utils import _cast_as_parameter
 from .._utils import _check_parameter
 from .._utils import _reshape_weights
 
@@ -17,13 +18,22 @@ class Distribution(torch.nn.Module):
 
 	def __init__(self, inertia, frozen):
 		super(Distribution, self).__init__()
+		self._device = _cast_as_parameter([0.0])
 
-		self.inertia = _check_parameter(inertia, "inertia", min_value=0, 
-			max_value=1, ndim=0)
-		self.frozen = _check_parameter(frozen, "frozen", 
-			value_set=[True, False], ndim=0) 
+		_check_parameter(inertia, "inertia", min_value=0, max_value=1, ndim=0)
+		_check_parameter(frozen, "frozen", value_set=[True, False], ndim=0)
+
+		self.register_buffer("inertia", _cast_as_tensor(inertia))
+		self.register_buffer("frozen", _cast_as_tensor(frozen))
 
 		self._initialized = False
+
+	@property
+	def device(self):
+		try:
+			return next(self.parameters()).device
+		except:
+			return 'cpu'
 
 	def forward(self, X):
 		self.summarize(X)
@@ -59,7 +69,8 @@ class Distribution(torch.nn.Module):
 		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32))
+			dtype=torch.float32), device=self.device)
+
 		return X, sample_weight
 
 	def from_summaries(self):

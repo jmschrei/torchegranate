@@ -25,8 +25,8 @@ class BayesMixin(torch.nn.Module):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.k)
-		self._log_priors = torch.log(self.priors)
+		self.register_buffer("_w_sum", torch.zeros(self.k, device=self.device))
+		self.register_buffer("_log_priors", torch.log(self.priors))
 
 	def _emission_matrix(self, X):
 		"""Return the emission/responsibility matrix.
@@ -51,7 +51,7 @@ class BayesMixin(torch.nn.Module):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
 			shape=(-1, self.d))
 
-		e = torch.empty(X.shape[0], self.k)
+		e = torch.empty(X.shape[0], self.k, device=self.device)
 		for i, d in enumerate(self.distributions):
 			e[:, i] = d.log_probability(X)
 

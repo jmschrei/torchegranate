@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import eps
@@ -49,7 +50,7 @@ class Bernoulli(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Bernoulli"
 
-		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
+		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
 			min_value=eps, max_value=1-eps, ndim=1)
 
 		self._initialized = self.probs is not None
@@ -70,7 +71,7 @@ class Bernoulli(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.probs = torch.zeros(d)
+		self.probs = _cast_as_parameter(torch.zeros(d))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -87,11 +88,11 @@ class Bernoulli(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d)
-		self._xw_sum = torch.zeros(self.d)
+		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
-		self._log_probs = torch.log(self.probs)
-		self._log_inv_probs = torch.log(1-self.probs)
+		self.register_buffer("_log_probs", torch.log(self.probs))
+		self.register_buffer("_log_inv_probs", torch.log(1-self.probs))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

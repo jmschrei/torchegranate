@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import _reshape_weights
@@ -54,7 +55,7 @@ class Categorical(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Categorical"
 
-		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
+		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
 			min_value=0, max_value=1, ndim=2)
 
 		self._initialized = probs is not None
@@ -79,7 +80,8 @@ class Categorical(Distribution):
 			The number of keys the distribution is being initialized with.
 		"""
 
-		self.probs = torch.zeros(d, n_keys)
+		self.probs = _cast_as_parameter(torch.zeros(d, n_keys, 
+			device=self.device))
 
 		self.n_keys = n_keys
 		self._initialized = True
@@ -97,10 +99,12 @@ class Categorical(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d)
-		self._xw_sum = torch.zeros(self.d, self.n_keys)
 
-		self._log_probs = torch.log(self.probs)
+		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, self.n_keys, 
+			device=self.device))
+
+		self.register_buffer("_log_probs", torch.log(self.probs))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

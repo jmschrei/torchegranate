@@ -5,6 +5,7 @@ import time
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
@@ -74,11 +75,13 @@ class KMeans(torch.nn.Module):
 		tol=0.1, inertia=0.0, frozen=False, random_state=None, verbose=False):
 		super().__init__()
 		self.name = "KMeans"
+		self._device = _cast_as_parameter([0.0])
 
-		self.centroids = _check_parameter(_cast_as_tensor(centroids, 
+		self.centroids = _check_parameter(_cast_as_parameter(centroids, 
 			dtype=torch.float32), "centroids", ndim=2)
-		self.k = _check_parameter(_cast_as_tensor(k), "k", ndim=0, min_value=2,
-			dtypes=(int, torch.int32, torch.int64))
+
+		self.k = _check_parameter(_cast_as_parameter(k), "k", ndim=0, 
+			min_value=2, dtypes=(int, torch.int32, torch.int64))
 
 		self.init = _check_parameter(init, "init", value_set=("random", 
 			"first-k", "submodular-facility-location", 
@@ -103,6 +106,13 @@ class KMeans(torch.nn.Module):
 		self._initialized = centroids is not None
 		self._reset_cache()
 
+	@property
+	def device(self):
+		try:
+			return next(self.parameters()).device
+		except:
+			return 'cpu'
+
 	def _initialize(self, X):
 		"""Initialize the probability distribution.
 
@@ -118,8 +128,13 @@ class KMeans(torch.nn.Module):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
-		self.centroids = _initialize_centroids(X, self.k, algorithm=self.init,
+		centroids = _initialize_centroids(X, self.k, algorithm=self.init, 
 			random_state=self.random_state)
+		
+		if centroids.device != self.device:
+			centroids = centroids.to(self.device)
+
+		self.centroids = _cast_as_parameter(centroids)
 
 		self.d = X.shape[1]
 		self._initialized = True
@@ -137,9 +152,12 @@ class KMeans(torch.nn.Module):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.k, self.d)
-		self._xw_sum = torch.zeros(self.k, self.d)
-		self._centroid_sum = torch.sum(self.centroids**2, axis=1).unsqueeze(0)
+		self.register_buffer("_w_sum", torch.zeros(self.k, self.d, 
+			device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.k, self.d,
+			device=self.device))
+		self.register_buffer("_centroid_sum", torch.sum(self.centroids**2, 
+			axis=1).unsqueeze(0))
 
 	def _distances(self, X):
 		"""Calculate the distances between each example and each centroid.
@@ -224,7 +242,7 @@ class KMeans(torch.nn.Module):
 		X = _check_parameter(_cast_as_tensor(X, dtype=torch.float32), "X", 
 			ndim=2, shape=(-1, self.d))
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32))
+			dtype=torch.float32), device=self.device)
 
 		distances = self._distances(X)
 		y_hat = distances.argmin(dim=1).unsqueeze(1).expand(-1, self.d)

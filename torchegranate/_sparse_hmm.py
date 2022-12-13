@@ -3,6 +3,7 @@ import numpy
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _check_hmm_inputs
@@ -14,7 +15,7 @@ from ._base import GraphMixin
 from ._base import Node
 
 NEGINF = float("-inf")
-
+inf = float("inf")
 
 def _convert_to_sparse_edges(nodes, edges, starts, ends, start, end):
 	if len(edges[0]) == 3:
@@ -112,13 +113,15 @@ class _SparseHMM(Distribution):
 		self.n_nodes = len(self.nodes)
 		self.n_edges = len(self.edges)
 
-		self.starts = torch.full((self.n_nodes,), NEGINF)
-		self.ends = torch.full((self.n_nodes,), NEGINF) 
+		self.starts = _cast_as_parameter(torch.full((self.n_nodes,), -inf))
+		self.ends = _cast_as_parameter(torch.full((self.n_nodes,), -inf))
 
-		self._edge_idx_starts = torch.empty(self.n_edges, dtype=torch.int64)
-		self._edge_idx_ends = torch.empty(self.n_edges, dtype=torch.int64)
-		self._edge_log_probabilities = torch.empty(self.n_edges, 
-			dtype=torch.float64)
+		_edge_idx_starts = _cast_as_parameter(torch.empty(self.n_edges, 
+			dtype=torch.int64))
+		_edge_idx_ends = _cast_as_parameter(torch.empty(self.n_edges, 
+			dtype=torch.int64))
+		_edge_log_probs = _cast_as_parameter(torch.empty(self.n_edges, 
+			dtype=torch.float64))
 
 		idx = 0
 		for ni, nj, probability in self.edges:
@@ -134,9 +137,9 @@ class _SparseHMM(Distribution):
 				i = self.nodes.index(ni)
 				j = self.nodes.index(nj)
 
-				self._edge_idx_starts[idx] = i
-				self._edge_idx_ends[idx] = j
-				self._edge_log_probabilities[idx] = math.log(probability)
+				_edge_idx_starts[idx] = i
+				_edge_idx_ends[idx] = j
+				_edge_log_probs[idx] = math.log(probability)
 				idx += 1
 
 		if torch.isinf(self.starts).sum() == len(self.starts):
@@ -146,9 +149,9 @@ class _SparseHMM(Distribution):
 
 		self.nodes = torch.nn.ModuleList(self.nodes)
 
-		self._edge_idx_starts = self._edge_idx_starts[:idx]
-		self._edge_idx_ends = self._edge_idx_ends[:idx]
-		self._edge_log_probabilities = self._edge_log_probabilities[:idx]
+		self._edge_idx_starts = _cast_as_parameter(_edge_idx_starts[:idx])
+		self._edge_idx_ends = _cast_as_parameter(_edge_idx_ends[:idx])
+		self._edge_log_probs = _cast_as_parameter(_edge_log_probs[:idx])
 		self.n_edges = idx
 
 		self._reset_cache()
@@ -162,9 +165,14 @@ class _SparseHMM(Distribution):
 		calculations.
 		"""
 
-		self._xw_sum = torch.zeros(self.n_edges, dtype=torch.float64)
-		self._xw_starts_sum = torch.zeros(self.n_nodes, dtype=torch.float64)
-		self._xw_ends_sum = torch.zeros(self.n_nodes, dtype=torch.float64)
+		self.register_buffer("_xw_sum", torch.zeros(self.n_edges, 
+			dtype=torch.float64, device=self.device))
+
+		self.register_buffer("_xw_starts_sum", torch.zeros(self.n_nodes, 
+			dtype=torch.float64, device=self.device))
+
+		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
+			dtype=torch.float64, device=self.device))
 
 	def forward(self, X, priors=None, emissions=None):
 		"""Run the forward algorithm on some data.
@@ -203,12 +211,13 @@ class _SparseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		f = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
+		f = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float64, 
+			device=self.device)
 		f[0] = self.starts + emissions[0].T + priors[:, 0]
 
 		for i in range(1, k):
 			p = f[i-1, :, self._edge_idx_starts]
-			p += self._edge_log_probabilities.expand(n, -1)
+			p += self._edge_log_probs.expand(n, -1)
 
 			alpha = torch.max(p, dim=1, keepdims=True).values
 			p = torch.exp(p - alpha)
@@ -259,13 +268,14 @@ class _SparseHMM(Distribution):
 		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
 		n, k, d = X.shape
 
-		b = torch.zeros(k, n, self.n_nodes, dtype=torch.float64) + float("-inf")
+		b = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float64,
+			device=self.device)
 		b[-1] = self.ends
 
 		for i in range(k-2, -1, -1):
 			p = b[i+1, :, self._edge_idx_ends]
 			p += emissions[i+1, self._edge_idx_ends].T + priors[:, i+1, self._edge_idx_ends]
-			p += self._edge_log_probabilities.expand(n, -1)
+			p += self._edge_log_probs.expand(n, -1)
 
 			alpha = torch.max(p, dim=1, keepdims=True).values
 			p = torch.exp(p - alpha)
@@ -347,7 +357,7 @@ class _SparseHMM(Distribution):
 
 		t = f[:, :-1, self._edge_idx_starts] + b[:, 1:, self._edge_idx_ends]
 		t += emissions[1:, self._edge_idx_ends].permute(2, 0, 1) + priors[:, 1:, self._edge_idx_ends]
-		t += self._edge_log_probabilities.expand(n, k-1, -1)
+		t += self._edge_log_probs.expand(n, k-1, -1)
 
 		starts = self.starts + emissions[0].T + priors[:, 0] + b[:, 0]
 		starts = torch.exp(starts.T - torch.logsumexp(starts, dim=-1)).T
@@ -425,15 +435,15 @@ class _SparseHMM(Distribution):
 
 		ends = torch.log(self._xw_ends_sum / node_out_count)
 		starts = torch.log(self._xw_starts_sum / self._xw_starts_sum.sum())
-		_edge_log_probabilities = torch.empty_like(self._edge_log_probabilities)
+		_edge_log_probs = torch.empty_like(self._edge_log_probs)
 
 		for i in range(self.n_edges):
 			t = self._xw_sum[i]
 			t_sum = node_out_count[self._edge_idx_starts[i]]
-			_edge_log_probabilities[i] = torch.log(t / t_sum)
+			_edge_log_probs[i] = torch.log(t / t_sum)
 
 		_update_parameter(self.ends, ends, inertia=self.inertia)
 		_update_parameter(self.starts, starts, inertia=self.inertia)
-		_update_parameter(self._edge_log_probabilities, _edge_log_probabilities,
+		_update_parameter(self._edge_log_probs, _edge_log_probs,
 			inertia=self.inertia)
 		self._reset_cache()

@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 
@@ -49,7 +50,7 @@ class Exponential(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Exponential"
 
-		self.scales = _check_parameter(_cast_as_tensor(scales), "scales", 
+		self.scales = _check_parameter(_cast_as_parameter(scales), "scales", 
 			min_value=0, ndim=1)
 
 		self._initialized = scales is not None
@@ -70,7 +71,7 @@ class Exponential(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.scales = torch.zeros(d)
+		self.scales = _cast_as_parameter(torch.zeros(d, device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -87,10 +88,10 @@ class Exponential(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d)
-		self._xw_sum = torch.zeros(self.d)
+		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
-		self._log_scales = torch.log(self.scales)
+		self.register_buffer("_log_scales", torch.log(self.scales))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

@@ -5,6 +5,7 @@ import time
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import _reshape_weights
@@ -70,7 +71,7 @@ class ZeroInflated(Distribution):
 		self.name = "ZeroInflated"
 
 		self.distribution = distribution
-		self.priors = _check_parameter(_cast_as_tensor(priors), "priors", 
+		self.priors = _check_parameter(_cast_as_parameter(priors), "priors", 
 			min_value=0, max_value=1, ndim=1, value_sum=1.0)
 
 		self.verbose = verbose
@@ -79,6 +80,11 @@ class ZeroInflated(Distribution):
 		
 		self.max_iter = max_iter
 		self.tol = tol
+
+		if self.priors is None and self.d is not None:
+			self.priors = _cast_as_parameter(torch.ones(self.d, 
+				device=self.device) / 2)
+
 		self._reset_cache()
 
 	def _initialize(self, X):
@@ -98,7 +104,8 @@ class ZeroInflated(Distribution):
 		self.distribution._initialize(X.shape[1])
 		self.distribution.fit(X)
 
-		self.priors = torch.ones(X.shape[1]) / 2
+		self.priors = _cast_as_parameter(torch.ones(X.shape[1], 
+			device=self.device) / 2)
 		self._initialized = True
 		super()._initialize(X.shape[1])
 
@@ -114,8 +121,9 @@ class ZeroInflated(Distribution):
 		if self._initialized == False:
 			return
 
-		self._w_sum = torch.zeros(self.d, 2)
-		self._log_priors = torch.log(self.priors)
+		self.register_buffer("_w_sum", torch.zeros(self.d, 2, 
+			device=self.device))
+		self.register_buffer("_log_priors", torch.log(self.priors))
 
 	def _emission_matrix(self, X):
 		"""Return the emission/responsibility matrix.
@@ -140,7 +148,7 @@ class ZeroInflated(Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
 			shape=(-1, self.d))
 
-		e = torch.empty(X.shape[0], self.d, 2)
+		e = torch.empty(X.shape[0], self.d, 2, device=self.device)
 		e[:, :, 0] = self._log_priors.unsqueeze(0)
 		e[:, :, 0] += self.distribution.log_probability(X).unsqueeze(1)
 		
@@ -224,7 +232,7 @@ class ZeroInflated(Distribution):
 
 		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32))
+			dtype=torch.float32), device=self.device)
 
 		e = self._emission_matrix(X)
 		logp = torch.logsumexp(e, dim=2, keepdims=True)
