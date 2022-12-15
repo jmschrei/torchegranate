@@ -1,6 +1,7 @@
-# test_Gamma.py
+# test_gamma.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -988,13 +989,23 @@ def test_fit_dtypes(X, shapes):
 	assert d._lgamma_shapes.dtype == torch.float64
 
 
+def test_serialization(X):
+	d = Gamma().fit(X[:4])
+	d.summarize(X[4:])
 
-def test_fit_raises(X, w, shapes):
-	_test_raises(Gamma(shapes), "fit", X, w=w, min_value=MIN_VALUE, 
-		max_value=MAX_VALUE)
+	rates = [1.704751, 1.222564, 2.227916]
 
-	_test_raises(Gamma(), "fit", X, w=w, min_value=MIN_VALUE, 
-		max_value=MAX_VALUE)
+	assert_array_almost_equal(d.rates, rates)
+	assert_array_almost_equal(d._log_rates, numpy.log(rates))
 
-	_test_raises(Gamma([VALID_VALUE]), "fit", X, w=w, 
-		min_value=MIN_VALUE, max_value=MAX_VALUE)
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.rates, rates)
+	assert_array_almost_equal(d2._log_rates, numpy.log(rates))
+
+	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
+	assert_array_almost_equal(d2._xw_sum, [11. ,  4.2,  4.4])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))
+	

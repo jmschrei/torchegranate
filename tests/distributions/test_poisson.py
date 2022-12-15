@@ -1,6 +1,7 @@
-# test_Poisson.py
+# test_poisson.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -798,3 +799,24 @@ def test_fit_raises(X, w, lambdas):
 
 	_test_raises(Poisson([VALID_VALUE]), "fit", X, w=w, 
 		min_value=MIN_VALUE, max_value=MAX_VALUE)
+
+
+def test_serialization(X):
+	d = Poisson().fit(X[:4])
+	d.summarize(X[4:])
+
+	lambdas = [1.  , 1.25, 1.25]
+
+	assert_array_almost_equal(d.lambdas, lambdas)
+	assert_array_almost_equal(d._log_lambdas, numpy.log(lambdas))
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.lambdas, lambdas)
+	assert_array_almost_equal(d2._log_lambdas, numpy.log(lambdas))
+
+	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
+	assert_array_almost_equal(d2._xw_sum, [10., 3., 4.])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))

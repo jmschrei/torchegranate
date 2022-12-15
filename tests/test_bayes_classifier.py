@@ -1,6 +1,7 @@
 # test_bayes_classifier.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -591,3 +592,24 @@ def test_fit_raises(model, X, w, y):
 	assert_raises(ValueError, model.fit, X[:len(X)-1], y, w)
 	assert_raises(ValueError, model.fit, X, y[:len(y)-1], w)
 	assert_raises(ValueError, model.fit, X, y, w[:len(w)-1])
+
+
+def test_serialization(X, model):
+	torch.save(model, ".pytest.torch")
+	model2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(model2.priors, model.priors)
+	assert_array_almost_equal(model2._log_priors, model._log_priors)
+
+	assert_array_almost_equal(model2.predict_proba(X), model.predict_proba(X))
+
+	m1d1, m1d2 = model.distributions
+	m2d1, m2d2 = model2.distributions
+
+	assert m1d1 is not m2d1
+	assert m1d2 is not m2d2
+
+	assert_array_almost_equal(m1d1.scales, m2d1.scales)
+	assert_array_almost_equal(m1d2.scales, m2d2.scales)
+	

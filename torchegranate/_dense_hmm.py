@@ -353,7 +353,57 @@ class _DenseHMM(Distribution):
 		fb = (fb - torch.logsumexp(fb, dim=2).reshape(len(X), -1, 1))
 		return t, fb, starts, ends, logp
 
-	def summarize(self, X, sample_weight=None, priors=None):
+	def _labeled_summarize(self, X, y):
+		"""Extract sufficient statistics given a set of labels.
+
+		This method calculates the sufficient statistics from data where the
+		observations have labels. This amounts to essentially counting the
+		number of times that each transition occurs and creating a sparse
+		update matrix.
+
+		
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to summarize.
+
+		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			A set of labels with the same shape as the observations that
+			indicate which node each observation came from. Passing this in
+			means that the model uses labeled learning instead of Baum-Welch.
+			Default is None.
+		"""
+
+		y = _check_parameter(_cast_as_tensor(y), "y", ndim=2, min_value=0, 
+			max_value=self.n_nodes-1, dtypes=(torch.int32, torch.int64),
+			shape=(X.shape[0], X.shape[1]))
+
+		n, l, d = X.shape
+
+		starts = torch.zeros(n, self.n_nodes, device=self.device)
+		starts[torch.arange(n), y[:, 0]] = 1 
+
+		ends = torch.zeros_like(starts)
+		ends[torch.arange(n), y[:, -1]] = 1
+
+		trans = torch.zeros((n, self.n_nodes, self.n_nodes), device=self.device)
+		emissions = torch.zeros(n, l, self.n_nodes, device=self.device) - inf
+
+		for i in range(n):
+			for j in range(l-1):
+				trans[i][y[i, j], y[i, j+1]] += 1
+				emissions[i, j, y[i, j]] = 0
+
+			emissions[i, l-1, y[i, l-1]] = 0
+
+		if self._initialized:
+			logps = self.log_probability(X)
+		else:
+			logps = torch.zeros(n, device=self.device)
+
+		return trans, emissions, starts, ends, logps
+
+	def summarize(self, X, y=None, sample_weight=None, priors=None):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
@@ -368,6 +418,12 @@ class _DenseHMM(Distribution):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to summarize.
 
+		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len), optional 
+			A set of labels with the same number of examples and length as the
+			observations that indicate which node in the model that each
+			observation should be assigned to. Passing this in means that the
+			model uses labeled training instead of Baum-Welch. Default is None.
+
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
 			(-1, self.d) or a vector of shape (-1,). Default is ones.
@@ -379,12 +435,16 @@ class _DenseHMM(Distribution):
 			probabilities).
 		"""
 
-		transitions, emissions, starts, ends, logps = self.forward_backward(X, 
-			priors=priors)
+		if y is None:
+			trans, emissions, starts, ends, logps = self.forward_backward(X, 
+				priors=priors)
+		else:
+			trans, emissions, starts, ends, logps = self._labeled_summarize(X, 
+				y=y)
 
 		self._xw_starts_sum += torch.sum(starts * sample_weight, dim=0)
 		self._xw_ends_sum += torch.sum(ends * sample_weight, dim=0)
-		self._xw_sum += torch.sum(transitions * sample_weight.unsqueeze(-1), 
+		self._xw_sum += torch.sum(trans * sample_weight.unsqueeze(-1), 
 			dim=0) 
 
 		X = X.reshape(-1, X.shape[-1])

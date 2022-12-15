@@ -1,6 +1,7 @@
-# test_bayes_classifier.py
+# test_kmeans.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -337,3 +338,19 @@ def test_fit_raises(model, X, w):
 	assert_raises(ValueError, model.fit, [X], [w])
 	assert_raises(ValueError, model.fit, X[:len(X)-1], w)
 	assert_raises(ValueError, model.fit, X, w[:len(w)-1])
+
+
+def test_serialization(X, model):
+	torch.save(model, ".pytest.torch")
+	model2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert model is not model2
+
+	assert_array_almost_equal(model2.centroids, model.centroids)
+	assert_array_almost_equal(model2._w_sum, model._w_sum)
+	assert_array_almost_equal(model2._xw_sum, model._xw_sum)
+	assert_array_almost_equal(model2._centroid_sum, model._centroid_sum)
+
+	assert_array_almost_equal(model2._distances(X), model._distances(X))
+	

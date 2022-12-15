@@ -1,6 +1,7 @@
 # test_uniform.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -824,3 +825,23 @@ def test_fit_raises(X, w, mins, maxs):
 
 	_test_raises(Uniform([VALID_VALUE], [VALID_VALUE+1]), "fit", X, w=w, 
 		min_value=MIN_VALUE, max_value=MAX_VALUE)
+
+
+def test_serialization(X):
+	d = Uniform().fit(X[:4])
+	d.summarize(X[4:])
+
+	assert_array_almost_equal(d.mins, [0.5, 0.2, 0.5])
+	assert_array_almost_equal(d.maxs, [3.1, 2.1, 2.2])
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.mins, [0.5, 0.2, 0.5])
+	assert_array_almost_equal(d2.maxs, [3.1, 2.1, 2.2])
+
+	assert_array_almost_equal(d2._x_mins, [2.2, 1.0, 0.1])
+	assert_array_almost_equal(d2._x_maxs, [5.4, 1.9, 4.0])
+	assert_array_almost_equal(d2._logps, [-0.955511, -0.641854, -0.530628])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))

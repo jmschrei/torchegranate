@@ -1,6 +1,7 @@
-# test_Categorical.py
+# test_categorical.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -748,3 +749,29 @@ def test_fit_raises(X, w, probs):
 
 	_test_raises(Categorical(), "fit", X, w=w, min_value=MIN_VALUE, 
 		max_value=MAX_VALUE)
+
+
+def test_serialization(X):
+	d = Categorical().fit(X[:4])
+	d.summarize(X[4:])
+
+	p = [[0.  , 0.5 , 0.25, 0.25],
+         [0.25, 0.25, 0.5 , 0.  ],
+         [0.25, 0.25, 0.5 , 0.  ]]
+
+	assert_array_almost_equal(d.probs, p)
+	assert_array_almost_equal(d._log_probs, numpy.log(p))
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.probs, p)
+	assert_array_almost_equal(d2._log_probs, numpy.log(p))
+
+	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
+	assert_array_almost_equal(d2._xw_sum, 
+		[[1., 1., 1., 0.],
+         [0., 3., 0., 0.],
+         [2., 0., 1., 0.]])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))

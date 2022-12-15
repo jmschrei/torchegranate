@@ -242,12 +242,12 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			The data to use to initialize the model.
 
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
-			(-1, self.d) or a vector of shape (-1,). Default is ones.
+			(-1, len) or a vector of shape (-1,). Default is ones.
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
@@ -283,13 +283,13 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 
 
 	
 		Returns
 		-------
-		e: torch.Tensor, shape=(-1, length, self.k)
+		e: torch.Tensor, shape=(-1, len, self.k)
 			A set of log probabilities for each example under each distribution.
 		"""
 
@@ -317,16 +317,16 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 		
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -335,7 +335,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		f: torch.Tensor, shape=(-1, length, self.k)
+		f: torch.Tensor, shape=(-1, len, self.n_nodes)
 			The log probabilities calculated by the forward algorithm.
 		"""
 
@@ -354,16 +354,16 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 		
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -372,7 +372,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		b: torch.Tensor, shape=(-1, length, self.k)
+		b: torch.Tensor, shape=(-1, len, self.n_nodes)
 			The log probabilities calculated by the backward algorithm.
 		"""
 
@@ -394,16 +394,16 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 		
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -479,10 +479,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -491,7 +491,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		y: torch.Tensor, shape=(-1, length, self.k)
+		y: torch.Tensor, shape=(-1, len, self.n_nodes)
 			The log posterior probabilities for each example under each 
 			component as calculated by the forward-backward algorithm.
 		"""
@@ -509,10 +509,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -521,7 +521,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		y: torch.Tensor, shape=(-1, length, self.k)
+		y: torch.Tensor, shape=(-1, len, self.n_nodes)
 			The posterior probabilities for each example under each component
 			as calculated by the forward-backward algorithm.
 		"""
@@ -538,7 +538,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
 
 		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
@@ -550,14 +550,14 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		y: torch.Tensor, shape=(-1, length, self.k)
+		y: torch.Tensor, shape=(-1, len, self.k)
 			The posterior probabilities for each example under each component
 			as calculated by the forward-backward algorithm.
 		"""
 
 		return torch.argmax(self.predict_log_proba(X, priors=priors), dim=-1)
 
-	def fit(self, X, sample_weight=None, priors=None):
+	def fit(self, X, y=None, sample_weight=None, priors=None):
 		"""Fit the model to optionally weighted examples.
 
 		This method implements the core of the learning process. For a hidden
@@ -573,8 +573,14 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 
+
+		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len), optional 
+			A set of labels with the same number of examples and length as the
+			observations that indicate which node in the model that each
+			observation should be assigned to. Passing this in means that the
+			model uses labeled training instead of Baum-Welch. Default is None.
 
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
@@ -592,7 +598,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		logp, last_logp = None, None
 		for i in range(self.max_iter):
 			start_time = time.time()
-			logp = self.summarize(X, sample_weight=sample_weight).sum()
+			logp = self.summarize(X, y=y, sample_weight=sample_weight).sum()
 
 			if i > 0:
 				improvement = logp - last_logp
@@ -610,7 +616,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			self.from_summaries()
 
 		if self.verbose:
-			logp = self.summarize(X, sample_weight=sample_weight).sum()
+			logp = self.summarize(X, y=y, sample_weight=sample_weight).sum()
 
 			improvement = logp - last_logp
 			duration = time.time() - start_time
@@ -621,7 +627,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self._reset_cache()
 		return self
 
-	def summarize(self, X, sample_weight=None, priors=None):
+	def summarize(self, X, y=None, sample_weight=None, priors=None):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
@@ -633,18 +639,30 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
+
+		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len), optional 
+			A set of labels with the same number of examples and length as the
+			observations that indicate which node in the model that each
+			observation should be assigned to. Passing this in means that the
+			model uses labeled training instead of Baum-Welch. Default is None.
 
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
-			(-1, self.d) or a vector of shape (-1,). Default is ones.
+			(-1, length, self.d) or a vector of shape (-1,). Default is ones.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
+
+
+		Returns
+		-------
+		logp: torch.Tensor, shape=(-1,)
+			The log probability of each example.
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
@@ -657,10 +675,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 				"sample_weight", min_value=0., ndim=1, 
 				shape=(len(X),)).reshape(-1, 1)
 
-		if not self._initialized:
+		if not self._initialized and y is None:
 			self._initialize(X, sample_weight=sample_weight)
 
-		return self._model.summarize(X, sample_weight=sample_weight, 
+		return self._model.summarize(X, y=y, sample_weight=sample_weight, 
 			priors=priors)
 
 	def from_summaries(self):

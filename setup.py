@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='torchegranate',
-	version='0.1.1',
+	version='0.1.2',
 	author='Jacob Schreiber',
 	author_email='jmschreiber91@gmail.com',
 	packages=['torchegranate', 'torchegranate.distributions'],

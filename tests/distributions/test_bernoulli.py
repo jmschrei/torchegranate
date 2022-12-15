@@ -1,6 +1,7 @@
-# test_Bernoulli.py
+# test_bernoulli.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -690,3 +691,24 @@ def test_fit_raises(X, w, probs):
 
 	_test_raises(Bernoulli([VALID_VALUE]), "fit", X, w=w, 
 		min_value=MIN_VALUE, max_value=MAX_VALUE)
+
+
+def test_serialization(X):
+	d = Bernoulli().fit(X[:4])
+	d.summarize(X[4:])
+
+	probs = [0.5, 0.25, 0.75]
+
+	assert_array_almost_equal(d.probs, probs)
+	assert_array_almost_equal(d._log_probs, numpy.log(probs))
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.probs, probs)
+	assert_array_almost_equal(d2._log_probs, numpy.log(probs))
+
+	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
+	assert_array_almost_equal(d2._xw_sum, [3, 3, 1.])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))

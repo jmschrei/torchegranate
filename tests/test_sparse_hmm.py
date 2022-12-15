@@ -123,7 +123,7 @@ def test_initialization_raises():
 def test_reset_cache(model, X):
 	model.summarize(X)
 	assert_array_almost_equal(model._model._xw_sum, 
-		[2.666842e-04, 1.895242e+00, 2.635101e+00, 3.469390e+00])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
 	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595])
 	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736])
 
@@ -440,27 +440,27 @@ def test_partial_summarize(model, X):
 	model.summarize(X[:1])
 
 	assert_array_almost_equal(model._model._xw_sum,
-		[2.635342e-04, 1.430404e-01, 8.828947e-01, 2.973801e+00])
+		[2.635347e-04, 1.430410e-01, 8.828942e-01, 2.973804e+00])
 	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 0.863595])
 	assert_array_almost_equal(model._model._xw_ends_sum, [0.876259, 0.123741])
 
 	assert_array_almost_equal(d1._w_sum, [1.019563, 1.019563, 1.019563])
 	assert_array_almost_equal(d1._xw_sum, [2.765183, 1.149069, 0.006899])
 
-	assert_array_almost_equal(d2._w_sum, [3.980437, 3.980437, 3.980437])
+	assert_array_almost_equal(d2._w_sum, [3.980435, 3.980435, 3.980435])
 	assert_array_almost_equal(d2._xw_sum, [4.234817, 4.85093 , 4.993101])	
 
 	model.summarize(X[1:])
 	assert_array_almost_equal(model._model._xw_sum, 
-		[2.666842e-04, 1.895242e+00, 2.635101e+00, 3.469390e+00])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
 	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595])
 	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736])
 
-	assert_array_almost_equal(d1._w_sum, [2.771773, 2.771773, 2.771773])
-	assert_array_almost_equal(d1._xw_sum, [5.403807, 2.901284, 0.006904])
+	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771])
+	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904])
 
-	assert_array_almost_equal(d2._w_sum, [7.228228, 7.228228, 7.228228])
-	assert_array_almost_equal(d2._xw_sum, [10.596193,  8.098716, 11.993096])	
+	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225])
+	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094])	
 
 
 def test_summarize(model, X):
@@ -469,15 +469,15 @@ def test_summarize(model, X):
 	model.summarize(X)
 
 	assert_array_almost_equal(model._model._xw_sum, 
-		[2.666842e-04, 1.895242e+00, 2.635101e+00, 3.469390e+00])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
 	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595])
 	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736])
 
-	assert_array_almost_equal(d1._w_sum, [2.771773, 2.771773, 2.771773])
-	assert_array_almost_equal(d1._xw_sum, [5.403807, 2.901284, 0.006904])
+	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771])
+	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904])
 
-	assert_array_almost_equal(d2._w_sum, [7.228228, 7.228228, 7.228228])
-	assert_array_almost_equal(d2._xw_sum, [10.596193,  8.098716, 11.993096])	
+	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225])
+	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094])	
 
 
 def test_summarize_weighted(model, X, w):
@@ -486,16 +486,16 @@ def test_summarize_weighted(model, X, w):
 	model.summarize(X, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
-		[2.707793e-04, 4.173104e+00, 4.912969e+00, 4.113656e+00])
+		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00])
 	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 3.163595])
 	assert_array_almost_equal(model._model._xw_ends_sum, [0.876271, 2.423729])
 
-	assert_array_almost_equal(d1._w_sum, [5.049645, 5.049645, 5.049645])
-	assert_array_almost_equal(d1._xw_sum, [8.834019e+00, 5.179163e+00, 
+	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643])
+	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
 		6.910709e-03])
 
-	assert_array_almost_equal(d2._w_sum, [11.450356, 11.450356, 11.450356])
-	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320837, 21.09309])	
+	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351])
+	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086])	
 
 
 def test_summarize_raises(model, X, w):
@@ -622,7 +622,7 @@ def test_from_summaries_weighted_inertia(X, w):
 	assert_array_almost_equal(model.starts, [-2.713066, -0.096492])
 	assert_array_almost_equal(model.ends, [-1.916754, -1.777675])
 	assert_array_almost_equal(model.edges, 
-		[-7.574243, -0.200404, -0.953491, -0.869844])
+		[-7.574241, -0.200404, -0.953492, -0.869843])
 
 	assert_array_almost_equal(d1.scales, 
 		[1.749434e+00, 1.025649e+00, 1.368553e-03], 3)
@@ -727,7 +727,7 @@ def test_fit(X):
 	assert_array_almost_equal(model.starts, [-1.489857e+01, -3.385568e-07], 4)
 	assert_array_almost_equal(model.ends, [-1.110725, -1.609444])
 	assert_array_almost_equal(model.edges, 
-		[-23.442373,  -0.399463, -11.607553,  -0.223153])
+		[-23.442364,  -0.399464, -11.60755 ,  -0.223153])
 
 	assert_array_almost_equal(d1.scales, [3.021216, 2.007029, 1.000361])
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
@@ -750,7 +750,7 @@ def test_fit(X):
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
 	assert_array_almost_equal(model.edges, 
-		[-23.906063,  -0.632214, -11.732584,  -0.223151])
+		[-23.906055,  -0.632214, -11.732577,  -0.223151])
 
 	assert_array_almost_equal(d1.scales, [2.603264, 2.076076, 1.532971])
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])

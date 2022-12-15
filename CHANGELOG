@@ -2,6 +2,34 @@
 Release History
 ===============
 
+Version 0.1.2
+=============
+
+Highlights
+----------
+
+	- Initial GPU support for all models and distributions
+	- Serialization support through native PyTorch
+
+HiddenMarkovModel
+-----------------
+
+	- Added labeled training by passing in an optional set of integer labels
+	alongside the data. 
+	- Changed defaults from 64-bit arrays to 32-bit to potentially make use of
+	tensor cores when using a GPU.
+
+
+
+Version 0.1.1
+=============
+
+Highlights
+----------
+
+	- Fixed a minor bug that surfaced after 0.1.0 release.
+
+
 
 Version 0.1.0
 ==============

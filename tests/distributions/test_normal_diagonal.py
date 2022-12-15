@@ -1,6 +1,7 @@
-# test_Normal.py
+# test_normal_diagonal.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -934,3 +935,27 @@ def test_fit_raises(X, w, means):
 
 	_test_raises(Normal([VALID_VALUE], covariance_type='diag'), "fit", X, w=w, 
 		min_value=MIN_VALUE, max_value=MAX_VALUE)
+
+
+def test_serialization(X):
+	d = Normal(covariance_type='diag').fit(X[:4])
+	d.summarize(X[4:])
+
+	means = [1.525, 1.375, 1.55 ]
+	covs = [0.931875, 0.626875, 0.5025  ]
+
+	assert_array_almost_equal(d.means, means)
+	assert_array_almost_equal(d.covs, covs)
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.means, means)
+	assert_array_almost_equal(d2.covs, covs)
+
+	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
+	assert_array_almost_equal(d2._xw_sum, [11. ,  4.2,  4.4])
+	assert_array_almost_equal(d2._xxw_sum, [45.56    ,  6.299999, 16.1     ])
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))
+	

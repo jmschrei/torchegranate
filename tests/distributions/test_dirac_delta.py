@@ -1,6 +1,7 @@
-# test_DiracDelta.py
+# test_dirac_delta.py
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
+import os
 import numpy
 import torch
 import pytest
@@ -554,3 +555,19 @@ def test_fit_raises(X, w, alphas):
 
 	_test_raises(DiracDelta([VALID_VALUE]), "fit", X, w=w, 
 		min_value=MIN_VALUE, max_value=MAX_VALUE)
+
+'''
+def test_serialization():
+	d = DiracDelta([1., 1., 2.])
+	assert_array_almost_equal(d.alphas, [1., 1., 2.])
+	assert_array_almost_equal(d._log_alphas, numpy.log([1., 1., 2.]))
+
+	torch.save(d, ".pytest.torch")
+	d2 = torch.load(".pytest.torch")
+	os.system("rm .pytest.torch")
+
+	assert_array_almost_equal(d2.alphas, [1., 1., 2.])
+	assert_array_almost_equal(d2._log_alphas, numpy.log([1., 1., 2.]))
+
+	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))
+'''
