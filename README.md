@@ -30,11 +30,12 @@ This rewrite was motivated by three main reasons:
 
 The ultimate goal is for this repository to include all of the useful features from pomegranate, at which point this repository will be merged back into the main pomegranate library. However, that is quite a far way off. Here are some milestones that I see for the next few releases.
 
-- v0.2.0: Addition of GPU support for all existing operations and serialization via PyTorch
-- v0.3.0: Addition of missing value support for all existing algorithms
-- v0.4.0: Addition of sampling algorithms for each existing method
-- v0.5.0: Addition of pass-through for forward and backward algorithms to enable direct inclusion of these components into PyTorch models
-- v0.6.0: Addition of Bayesian networks and factor graphs in a basic form
+- [x] v0.1.0: Initial draft of most models with basic feature support, only on CPUs
+- [ ] v0.2.0: Addition of GPU support for all existing operations and serialization via PyTorch
+- [ ] v0.3.0: Addition of missing value support for all existing algorithms
+- [ ] v0.4.0: Addition of sampling algorithms for each existing method
+- [ ] v0.5.0: Addition of pass-through for forward and backward algorithms to enable direct inclusion of these components into PyTorch models
+- [ ] v0.6.0: Addition of Bayesian networks and factor graphs in a basic form
 
 ### Frequently Asked Questions
 
