@@ -419,7 +419,7 @@ class _SparseHMM(Distribution):
 				t[i][idx] += 1
 				r[i, j, y[i, j]] = 0
 
-			r[i, k-1, y[i, k-1]] = 0
+			r[i, l-1, y[i, l-1]] = 0
 
 		if self._initialized:
 			logps = self.log_probability(X)
