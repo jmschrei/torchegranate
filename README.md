@@ -31,11 +31,84 @@ This rewrite was motivated by three main reasons:
 The ultimate goal is for this repository to include all of the useful features from pomegranate, at which point this repository will be merged back into the main pomegranate library. However, that is quite a far way off. Here are some milestones that I see for the next few releases.
 
 - [x] v0.1.0: Initial draft of most models with basic feature support, only on CPUs
-- [ ] v0.2.0: Addition of GPU support for all existing operations and serialization via PyTorch
-- [ ] v0.3.0: Addition of missing value support for all existing algorithms
+- [x] v0.2.0: Addition of GPU support for all existing operations and serialization via PyTorch
+- [x] v0.3.0: Addition of missing value support for all existing algorithms
 - [ ] v0.4.0: Addition of sampling algorithms for each existing method
 - [ ] v0.5.0: Addition of pass-through for forward and backward algorithms to enable direct inclusion of these components into PyTorch models
 - [ ] v0.6.0: Addition of Bayesian networks and factor graphs in a basic form
+
+### GPU Support
+
+All distributions in torchegranate have GPU support. Because each distribution is a `torch.nn.Module` object, the use is identical to other code written in PyTorch. This means that both the model and the data have to be moved to the GPU by the user. For instance:
+
+```python
+>>> X = torch.exp(torch.randn(50, 4))
+
+# Will execute on the CPU
+>>> d = Exponential().fit(X)
+>>> d.scales
+Parameter containing:
+tensor([1.8627, 1.3132, 1.7187, 1.4957])
+
+# Will execute on a GPU
+>>> d = Exponential().cuda().fit(X.cuda())
+>>> d.scales
+Parameter containing:
+tensor([1.8627, 1.3132, 1.7187, 1.4957], device='cuda:0')
+```
+
+Likewise, all models are distributions, and so can be used on the GPU similarly. When a model is moved to the GPU, all of the models associated with it (e.g. distributions) are also moved to the GPU.
+
+```python
+>>> X = torch.exp(torch.randn(50, 4)).cuda()
+>>> model = GeneralMixtureModel([Exponential(), Exponential()]).cuda()
+>>> model.fit(X)
+[1] Improvement: 1.26068115234375, Time: 0.001134s
+[2] Improvement: 0.168121337890625, Time: 0.001097s
+[3] Improvement: 0.037841796875, Time: 0.001095s
+>>> model.distributions[0].scales
+Parameter containing:
+>>> model.distributions[1].scales
+tensor([0.9141, 1.0835, 2.7503, 2.2475], device='cuda:0')
+Parameter containing:
+tensor([1.9902, 2.3871, 0.8984, 1.2215], device='cuda:0')
+```
+
+### Serialization
+
+torchegranate objects are all instances of `torch.nn.Module` and so serialization is the same as any other model and can use any of the other built-in functionality.
+
+Saving:
+```python
+>>> X = torch.exp(torch.randn(50, 4)).cuda()
+>>> model = GeneralMixtureModel([Exponential(), Exponential()], verbose=True)
+>>> model.cuda()
+>>> model.fit(X)
+>>> torch.save(model, "test.torch")
+```
+
+Loading:
+```python
+>>> model = torch.load("test.torch")
+```
+
+### Missing Values
+
+torchegranate supports handling data with missing values through `torch.masked.MaskedTensor` objects. Simply, one needs to just put a mask over the values that are missing.
+
+```python
+>>> X = <your tensor with NaN for the missing values>
+>>> mask = ~torch.isnan(X)
+>>> X_masked = torch.masked.MaskedTensor(X, mask=mask)
+>>> d = Normal(covariance_type='diag').fit(X_masked)
+>>> d.means
+Parameter containing:
+tensor([0.2271, 0.0290, 0.0763, 0.0135])
+```
+
+All algorithms currently treat missingness as something to ignore. As an example, when calculating the mean of a column with missing values, the mean will simply be the average value of the present values. Missing values are not imputed because improper imputation can bias your data, produce unlikely estimates which distort distributions, and also shrink the variance.
+
+Because not all operations are yet available for MaskedTensors, the following distributions are not yet supported for missing values: Bernoulli, categorical, normal with full covariance, uniform
 
 ### Frequently Asked Questions
 
