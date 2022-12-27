@@ -409,7 +409,7 @@ class _SparseHMM(Distribution):
 		ends[torch.arange(n), y[:, -1]] = 1
 
 		t = torch.zeros((n, self.n_edges), device=self.device)
-		r = torch.zeros(n, k, self.n_nodes, device=self.device) - inf
+		r = torch.zeros(n, l, self.n_nodes, device=self.device) - inf
 
 		for i in range(n):
 			for j in range(l-1):
