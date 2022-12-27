@@ -2,9 +2,6 @@ import math
 import numpy
 import torch
 
-import triton
-import triton.language as tl
-
 from ._utils import _cast_as_tensor
 from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
