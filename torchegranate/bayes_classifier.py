@@ -180,4 +180,5 @@ class BayesClassifier(BayesMixin, Distribution):
 			d.summarize(X[idx], sample_weight[idx])
 
 			if self.frozen == False:
-				self._w_sum[j] += sample_weight[idx].mean(dim=-1).sum()
+				self._w_sum[j] = self._w_sum[j] + sample_weight[idx].mean(
+					dim=-1).sum()

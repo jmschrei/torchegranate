@@ -73,7 +73,7 @@ class Gamma(Distribution):
 			ndim=0)
 
 		self._initialized = (shapes is not None) and (rates is not None)
-		self.d = len(self.shapes) if self._initialized else None
+		self.d = self.shapes.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
@@ -175,9 +175,10 @@ class Gamma(Distribution):
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weight, dim=0)
-		self._xw_sum += torch.sum(X * sample_weight, dim=0)
-		self._logx_w_sum += torch.sum(torch.log(X) * sample_weight, dim=0)
+		self._w_sum[:] = self._w_sum + torch.sum(sample_weight, dim=0)
+		self._xw_sum[:] = self._xw_sum + torch.sum(X * sample_weight, dim=0)
+		self._logx_w_sum[:] = self._logx_w_sum + torch.sum(torch.log(X) * 
+			sample_weight, dim=0)
 
 	def from_summaries(self):
 		"""Update the model parameters given the extracted statistics.

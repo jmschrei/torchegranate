@@ -21,6 +21,7 @@ from numpy.testing import assert_array_almost_equal
 MIN_VALUE = None
 MAX_VALUE = None
 VALID_VALUE = 1.2
+inf = float("inf")
 
 
 @pytest.fixture
@@ -36,6 +37,25 @@ def X():
 	     [1, 1, 0],
 	     [0, 2, 1],
 	     [0, 0, 0]]
+
+
+@pytest.fixture
+def X_masked(X):
+	mask = torch.tensor(numpy.array([
+		[False, True,  True ],
+		[True,  True,  False],
+		[False, False, False],
+		[True,  True,  True ],
+		[False, True,  False],
+		[True,  True,  True ],
+		[False, False, False],
+		[True,  False, True ],
+		[True,  True,  True ],
+		[True,  True,  True ],
+		[True,  False, True ]]))
+
+	X = torch.tensor(numpy.array(X))
+	return torch.masked.MaskedTensor(X, mask=mask)
 
 
 @pytest.fixture
@@ -138,17 +158,17 @@ def test_predict_raises(model, X):
 def test_distances(model, X):
 	y_hat = model._distances(X)
 	assert_array_almost_equal(y_hat,
-		[[2.2361, 1.7321],
-         [1.0000, 3.0000],
-         [1.4142, 3.1623],
-         [2.4495, 3.1623],
-         [2.4495, 1.4142],
-         [5.0990, 5.8310],
-         [1.7321, 1.0000],
-         [1.0000, 3.3166],
-         [1.4142, 1.4142],
-         [2.2361, 3.0000],
-         [1.4142, 2.4495]], 4)
+		[[1.2910, 1.0000],
+         [0.5774, 1.7321],
+         [0.8165, 1.8257],
+         [1.4142, 1.8257],
+         [1.4142, 0.8165],
+         [2.9439, 3.3665],
+         [1.0000, 0.5774],
+         [0.5774, 1.9149],
+         [0.8165, 0.8165],
+         [1.2910, 1.7321],
+         [0.8165, 1.4142]], 4)
 
 
 def test_distances_raises(model, X):
@@ -303,8 +323,8 @@ def test_fit(model, X):
 	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
 	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
 	assert_array_almost_equal(model.centroids, 
-		[[2.25    , 1.      , 2.5     ],
-         [1.      , 1.      , 0.285714]])
+		[[1.5, 1. , 2. ],
+         [1.4, 1. , 0. ]])
 
 
 def test_fit_weighted(model, X, w):
@@ -323,8 +343,8 @@ def test_fit_chain(X):
 	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
 	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
 	assert_array_almost_equal(model.centroids, 
-		[[3.      , 1.25    , 1.5     ],
-         [0.571429, 0.857143, 0.857143]])
+		[[2.6     , 1.4     , 1.2     ],
+         [0.5     , 0.666667, 1.      ]])
 
 
 def test_fit_raises(model, X, w):
@@ -353,4 +373,100 @@ def test_serialization(X, model):
 	assert_array_almost_equal(model2._centroid_sum, model._centroid_sum)
 
 	assert_array_almost_equal(model2._distances(X), model._distances(X))
-	
+
+
+def test_masked_distances(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	y_hat = model._distances(X_)
+	assert_array_almost_equal(y_hat,
+		[[1.2910, 1.0000],
+         [0.5774, 1.7321],
+         [0.8165, 1.8257],
+         [1.4142, 1.8257],
+         [1.4142, 0.8165],
+         [2.9439, 3.3665],
+         [1.0000, 0.5774],
+         [0.5774, 1.9149],
+         [0.8165, 0.8165],
+         [1.2910, 1.7321],
+         [0.8165, 1.4142]], 4)
+
+	y_hat = model._distances(X_masked)
+	assert_array_almost_equal(y_hat,
+		[[1.7321, 1.7321],
+         [1.0000, 1.7321],
+         [   inf,    inf],
+         [1.4142, 1.8257],
+         [1.7321, 2.2361],
+         [2.9439, 3.3665],
+         [   inf,    inf],
+         [0.7071, 2.3452],
+         [0.8165, 0.8165],
+         [1.2910, 1.7321],
+         [1.0000, 1.7321]], 4)
+
+
+def test_masked_summarize(model, X, X_masked, w):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	model.summarize(X_, sample_weight=w)
+	assert_array_almost_equal(model._w_sum, [[7., 7., 7.], [8., 8., 8.]])
+	assert_array_almost_equal(model._xw_sum, [[ 7.,  6., 10.], [20.,  9.,  0.]])
+
+	model = KMeans(2)
+	model.summarize(X_masked, sample_weight=w)
+	assert_array_almost_equal(model._w_sum, [[ 4., 10.,  5.], [ 3.,  2.,  1.]])
+	assert_array_almost_equal(model._xw_sum, [[ 6., 13.,  6.], [ 1.,  0.,  2.]])
+
+
+def test_masked_from_summaries(model, X, X_masked, w):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	model.summarize(X_, sample_weight=w)
+	model.from_summaries()
+
+	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model.centroids, 
+		[[1.      , 0.857143, 1.428571],
+         [2.5     , 1.125   , 0.      ]])
+
+	model = KMeans(centroids=[[1, 0, 1], [2, 1, 0]])
+	model.summarize(X_masked, sample_weight=w)
+	model.from_summaries()
+
+	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model.centroids, 
+		[[0.2     , 1.      , 1.333333],
+         [3.      , 1.333333, 1.333333]])
+
+
+def test_masked_fit(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	model.fit(X_)
+
+	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model.centroids, 
+		[[1.5, 1. , 2. ],
+         [1.4, 1. , 0. ]])
+
+	model = KMeans(centroids=[[1, 0, 1], [2, 1, 0]])
+	model.fit(X_masked)
+
+	assert_array_almost_equal(model._w_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model._xw_sum, [[0., 0., 0.], [0., 0., 0.]])
+	assert_array_almost_equal(model.centroids, 
+		[[0.4, 1.2, 0.6],
+         [3.5, 1.5, 3. ]])

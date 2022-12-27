@@ -39,6 +39,25 @@ def X():
 
 
 @pytest.fixture
+def X_masked(X):
+	X = torch.tensor(numpy.array(X))
+
+	mask = [[[True , True , True ],
+	         [True , False, False],
+	         [False, False, False],
+	         [True , True , True ],
+	         [True , True , True ]],
+	        [[True , True , True ],
+	         [False, True , True ],
+	         [True , False, True ],
+	         [True , True , True ],
+	         [False, False, False]]]
+
+	mask = torch.tensor(numpy.array(mask), dtype=torch.bool)
+	return torch.masked.MaskedTensor(X, mask=mask)
+
+
+@pytest.fixture
 def w():
 	return [1, 2.3]
 
@@ -822,3 +841,393 @@ def test_fit_raises(model, X, w):
 	assert_raises(ValueError, model.fit, [X], [w])
 	assert_raises(ValueError, model.fit, X[:len(X)-1], w)
 	assert_raises(ValueError, model.fit, X, w[:len(w)-1])
+
+###
+
+def test_masked_log_probability(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	logp = model.log_probability(X_)
+	assert_array_almost_equal(logp, [-22.8266, -22.8068], 4)
+
+	logp = model.log_probability(X_masked)
+	assert_array_almost_equal(logp, [-15.463 , -16.3894], 4)
+
+
+def test_masked_probability(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	p = model.probability(X_)
+	assert_array_almost_equal(p, [1.2205e-09, 1.2449e-09], 4)
+
+	p = model.probability(X_masked)
+	assert_array_almost_equal(p, [1.9253e-07, 7.6242e-08], 4)
+
+
+def test_masked_forward(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	f = model.forward(X_)
+	assert_array_almost_equal(f,
+		[[[ -5.9877,  -3.8603],
+          [-12.2607,  -7.0036],
+          [-29.2507, -11.7311],
+          [-37.7895, -17.4549],
+          [-20.6561, -22.6136]],
+
+         [[-44.5591,  -8.0226],
+          [-10.7476, -12.5146],
+          [-30.3480, -14.7513],
+          [-17.0002, -18.5767],
+          [-32.7223, -20.5042]]], 4)
+
+	f = model.forward(X_masked)
+	assert_array_almost_equal(f,
+		[[[ -5.9877,  -3.8603],
+          [ -5.7673,  -4.6291],
+          [ -5.7316,  -4.7842],
+          [-30.7211, -10.0912],
+          [-13.2925, -15.2500]],
+
+         [[-44.5591,  -8.0226],
+          [ -9.0533, -10.7758],
+          [-29.8424, -11.9204],
+          [-14.1693, -15.7458],
+          [-15.9894, -14.2483]]], 4)
+
+
+
+def test_masked_backward(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	b = model.backward(X_)
+	assert_array_almost_equal(b,
+		[[[-18.8311, -19.1130],
+          [-15.5423, -15.8300],
+          [-10.8078, -11.0955],
+          [ -6.1547,  -5.3717],
+          [ -2.3026,  -2.3026]],
+
+         [[-15.5896, -14.7842],
+          [-12.1797, -12.4674],
+          [ -8.8158,  -8.0555],
+          [ -5.9508,  -6.2384],
+          [ -2.3026,  -2.3026]]], 4)
+
+	b = model.backward(X_masked)
+	assert_array_almost_equal(b,
+		[[[-11.6441, -11.7241],
+          [-11.1645, -11.0955],
+          [-10.8078, -11.0955],
+          [ -6.1547,  -5.3717],
+          [ -2.3026,  -2.3026]],
+
+         [[ -9.1620,  -8.3668],
+          [ -7.4618,  -7.7494],
+          [ -5.1529,  -4.4689],
+          [ -2.4079,  -2.4079],
+          [ -2.3026,  -2.3026]]], 4)
+
+
+def test_masked_forward_backward(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	t, r, starts, ends, logp = model.forward_backward(X_)
+	assert_array_almost_equal(t,
+		[[2.635347e-04, 1.430410e-01, 8.828942e-01, 2.973804e+00],
+         [3.150036e-06, 1.752202e+00, 1.752205e+00, 4.955886e-01]])
+
+	assert_array_almost_equal(r,
+		[[[-1.9921e+00, -1.4665e-01],
+          [-4.9764e+00, -6.9228e-03],
+          [-1.7232e+01, -3.2831e-08],
+          [-2.1118e+01, -6.7415e-10],
+          [-1.3209e-01, -2.0896e+00]],
+
+         [[-3.7342e+01,  0.0000e+00],
+          [-1.2056e-01, -2.1752e+00],
+          [-1.6357e+01, -7.8752e-08],
+          [-1.4412e-01, -2.0083e+00],
+          [-1.2218e+01, -4.9402e-06]]], 3)
+
+	assert_array_almost_equal(starts, 
+		[[1.3641e-01, 8.6359e-01],
+         [6.0619e-17, 1.0000e+00]], 3)
+
+	assert_array_almost_equal(ends,
+		[[8.7626e-01, 1.2374e-01],
+         [4.9402e-06, 1.0000e+00]], 3)
+
+	assert_array_almost_equal(logp, [-22.8266, -22.8068], 3)
+
+
+	t, r, starts, ends, logp = model.forward_backward(X_masked)
+	assert_array_almost_equal(t,
+		[[0.041682, 0.643657, 1.405594, 1.90907 ],
+         [0.092079, 1.618498, 1.767671, 0.521754]])
+
+	assert_array_almost_equal(r,
+		[[[ -2.1687,  -0.1214],
+          [ -1.4687,  -0.2616],
+          [ -1.0765,  -0.4167],
+          [-21.4128,   0.0000],
+          [ -0.1321,  -2.0896]],
+
+         [[-37.3318,   0.0000],
+          [ -0.1257,  -2.1359],
+          [-18.6059,   0.0000],
+          [ -0.1879,  -1.7644],
+          [ -1.9026,  -0.1615]]], 3)
+
+	assert_array_almost_equal(starts, 
+		[[1.1432e-01, 8.8568e-01],
+         [6.1237e-17, 1.0000e+00]], 3)
+
+	assert_array_almost_equal(ends,
+		[[0.8763, 0.1237],
+         [0.1492, 0.8508]], 3)
+
+	assert_array_almost_equal(logp, [-15.4630, -16.3894], 3)
+
+
+def test_masked_predict(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	y_hat = model.predict(X_)
+	assert_array_almost_equal(y_hat, 
+		[[1, 1, 1, 1, 0],
+         [1, 0, 1, 0, 1]], 4)
+
+	y_hat = model.predict(X_masked)
+	assert_array_almost_equal(y_hat, 
+		[[1, 1, 1, 1, 0],
+         [1, 0, 1, 0, 1]], 4)
+
+
+def test_masked_predict_proba(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	y_hat = model.predict_proba(X_)
+	assert_array_almost_equal(y_hat,
+		[[[1.3641e-01, 8.6359e-01],
+          [6.8989e-03, 9.9310e-01],
+          [3.2831e-08, 1.0000e+00],
+          [6.7415e-10, 1.0000e+00],
+          [8.7626e-01, 1.2374e-01]],
+
+         [[6.0619e-17, 1.0000e+00],
+          [8.8642e-01, 1.1358e-01],
+          [7.8752e-08, 1.0000e+00],
+          [8.6578e-01, 1.3422e-01],
+          [4.9402e-06, 1.0000e+00]]], 4)
+
+	assert_array_almost_equal(torch.sum(y_hat, dim=-1),
+		[[1.0000, 1.0000, 1.0000, 1.0000, 1.0000],
+         [1.0000, 1.0000, 1.0000, 1.0000, 1.0000]])
+
+
+	y_hat = model.predict_proba(X_masked)
+	assert_array_almost_equal(y_hat,
+		[[[1.1432e-01, 8.8568e-01],
+          [2.3021e-01, 7.6979e-01],
+          [3.4080e-01, 6.5920e-01],
+          [5.0183e-10, 1.0000e+00],
+          [8.7626e-01, 1.2374e-01]],
+
+         [[6.1237e-17, 1.0000e+00],
+          [8.8186e-01, 1.1814e-01],
+          [8.3094e-09, 1.0000e+00],
+          [8.2871e-01, 1.7129e-01],
+          [1.4918e-01, 8.5083e-01]]], 4)
+
+	assert_array_almost_equal(torch.sum(y_hat, dim=-1),
+		[[1.0000, 1.0000, 1.0000, 1.0000, 1.0000],
+         [1.0000, 1.0000, 1.0000, 1.0000, 1.0000]])
+
+
+def test_masked_predict_log_proba(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	y_hat = model.predict_log_proba(X_)
+	assert_array_almost_equal(y_hat,
+		[[[-1.9921e+00, -1.4665e-01],
+          [-4.9764e+00, -6.9228e-03],
+          [-1.7232e+01, -3.2831e-08],
+          [-2.1118e+01, -6.7415e-10],
+          [-1.3209e-01, -2.0896e+00]],
+
+         [[-3.7342e+01,  0.0000e+00],
+          [-1.2056e-01, -2.1752e+00],
+          [-1.6357e+01, -7.8752e-08],
+          [-1.4412e-01, -2.0083e+00],
+          [-1.2218e+01, -4.9402e-06]]], 3)
+
+	y_hat = model.predict_log_proba(X_masked)
+	assert_array_almost_equal(y_hat,
+		[[[ -2.1687,  -0.1214],
+          [ -1.4687,  -0.2616],
+          [ -1.0765,  -0.4167],
+          [-21.4128,   0.0000],
+          [ -0.1321,  -2.0896]],
+
+         [[-37.3318,   0.0000],
+          [ -0.1257,  -2.1359],
+          [-18.6059,   0.0000],
+          [ -0.1879,  -1.7644],
+          [ -1.9026,  -0.1615]]], 3)
+
+
+def test_masked_ones_summarize(model, X, w):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+	model.summarize(X_, sample_weight=w)
+
+	assert_array_almost_equal(model._model._xw_sum, 
+		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00])
+	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 3.163595])
+	assert_array_almost_equal(model._model._xw_ends_sum, [0.876271, 2.423729])
+
+	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643])
+	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
+		6.910696e-03])
+
+	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351])
+	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086])	
+
+
+def test_masked_summarize(model, X, X_masked, w):
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+	model.summarize(X_masked, sample_weight=w)
+
+	assert_array_almost_equal(model._model._xw_sum, 
+		[0.2535, 4.3662, 5.4712, 3.1091], 4)
+	assert_array_almost_equal(model._model._xw_starts_sum, [0.1143, 3.1857], 4)
+	assert_array_almost_equal(model._model._xw_ends_sum, [1.2194, 2.0806], 4)
+
+	assert_array_almost_equal(d1._w_sum, [3.1268, 4.9249, 4.9249], 4)
+	assert_array_almost_equal(d1._xw_sum, [4.6491e+00, 5.0392e+00, 3.9227e-08],
+		4)
+
+	assert_array_almost_equal(d2._w_sum, [7.7732, 4.9751, 7.2751], 4)
+	assert_array_almost_equal(d2._xw_sum, [17.4509,  6.8608, 15.8000], 4)
+
+
+def test_masked_ones_from_summaries(model, X, w):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+
+	model.summarize(X_, sample_weight=w)
+	model.from_summaries()
+
+	assert_array_almost_equal(model.starts, [-3.186049, -0.042213])
+	assert_array_almost_equal(model.ends, [-1.7514  , -1.552714])
+	assert_array_almost_equal(model.edges, 
+		[-9.833523, -0.190658, -0.846143, -1.023708])
+
+	assert_array_almost_equal(d1.scales, 
+		[1.749434e+00, 1.025649e+00, 1.368553e-03])
+	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
+
+	assert_array_almost_equal(d2.scales, [1.647633, 1.076022, 1.842134])
+	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
+
+
+def test_masked_from_summaries(model, X_masked, w):
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+
+	model.summarize(X_masked, sample_weight=w)
+	model.from_summaries()
+
+	assert_array_almost_equal(model.starts, [-3.3627, -0.0353], 4)
+	assert_array_almost_equal(model.ends, [-1.5662, -1.6339], 4)
+	assert_array_almost_equal(model.edges, 
+		[-3.1371, -0.2907, -0.6671, -1.2323], 4)
+
+	assert_array_almost_equal(d1.scales, 
+		[1.4869e+00, 1.0232e+00, 7.9650e-09], 4)
+	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
+
+	assert_array_almost_equal(d2.scales, [2.2450, 1.3790, 2.1718], 4)
+	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
+
+
+def test_masked_fit(X, X_masked):
+	X = torch.tensor(numpy.array(X) + 1)
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
+	model.bake()
+	model.fit(X_)
+
+	
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+
+	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
+	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
+	assert_array_almost_equal(model.edges, 
+		[-23.906055,  -0.632214, -11.732577,  -0.223151])
+
+	assert_array_almost_equal(d1.scales, [2.603264, 2.076076, 1.532971])
+	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
+
+	assert_array_almost_equal(d2.scales, [2.6     , 2.1     , 2.200005])
+	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
+
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
+	model.bake()
+	model.fit(X_masked + 1)
+
+	d1 = model.nodes[0].distribution
+	d2 = model.nodes[1].distribution
+
+	assert_array_almost_equal(model.starts, [-16.6664,   0.0000], 4)
+	assert_array_almost_equal(model.ends, [-0.9247, -1.7014], 4)
+	assert_array_almost_equal(model.edges, 
+		[-3.5068, -0.5563, -2.4457, -0.3135], 4)
+
+	assert_array_almost_equal(d1.scales, [2.5729, 2.1118, 1.4393], 4)
+	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
+
+	assert_array_almost_equal(d2.scales, [2.8777, 2.3498, 2.1939], 4)
+	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
+	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])

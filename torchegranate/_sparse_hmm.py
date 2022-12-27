@@ -6,7 +6,6 @@ from ._utils import _cast_as_tensor
 from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
-from ._utils import _check_hmm_inputs
 
 from .distributions._distribution import Distribution
 
@@ -182,7 +181,8 @@ class _SparseHMM(Distribution):
 		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
 			dtype=torch.float32, device=self.device))
 
-	def forward(self, X, priors=None, emissions=None):
+	@torch.inference_mode()
+	def forward(self, emissions, priors):
 		"""Run the forward algorithm on some data.
 
 		Runs the forward algorithm on a batch of sequences. This is not to be
@@ -191,39 +191,39 @@ class _SparseHMM(Distribution):
 		start state and returns the probability, over all paths through the
 		model, that result in the alignment of symbol i to node j.
 
+		Note that, as an internal method, this does not take as input the
+		actual sequence of observations but, rather, the emission probabilities
+		calculated from the sequence given the model.
+
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
-			A set of examples to evaluate. 		
+		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call. 		
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: torch.Tensor, shape=(-1, -1, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
-
 
 		Returns
 		-------
-		f: torch.Tensor, shape=(-1, length, self.k)
+		f: torch.Tensor, shape=(-1, -1, self.n_nodes)
 			The log probabilities calculated by the forward algorithm.
 		"""
 
-		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
-		n, k, d = X.shape
+		n, l, _ = emissions.shape
 
-		f = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float32, 
+		f = torch.full((l, n, self.n_nodes), -inf, dtype=torch.float32, 
 			device=self.device)
-		f[0] = self.starts + emissions[0].T + priors[:, 0]
+		f[0] = self.starts + emissions[:, 0] + priors[:, 0]
 
-		for i in range(1, k):
+		for i in range(1, l):
 			p = f[i-1, :, self._edge_idx_starts]
 			p += self._edge_log_probs.expand(n, -1)
 
@@ -233,12 +233,13 @@ class _SparseHMM(Distribution):
 			z = torch.zeros_like(f[i])
 			z.scatter_add_(1, self._edge_idx_ends.expand(n, -1), p)
 
-			f[i] = alpha + torch.log(z) + emissions[i].T + priors[:, i]
+			f[i] = alpha + torch.log(z) + emissions[:, i] + priors[:, i]
 
 		f = f.permute(1, 0, 2)
 		return f
 
-	def backward(self, X, priors=None, emissions=None):
+	@torch.inference_mode()
+	def backward(self, emissions, priors):
 		"""Run the backward algorithm on some data.
 
 		Runs the backward algorithm on a batch of sequences. This is not to be
@@ -248,41 +249,41 @@ class _SparseHMM(Distribution):
 		model, that result in the alignment of symbol i to node j, working
 		backwards.
 
+		Note that, as an internal method, this does not take as input the
+		actual sequence of observations but, rather, the emission probabilities
+		calculated from the sequence given the model.
+
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
-			A set of examples to evaluate. 		
-
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
-
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
+		emissions: torch.Tensor, shape=(-1, l, self.n_nodes)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.
 
+		priors: torch.Tensor, shape=(-1, l, self.n_nodes)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
 
 		Returns
 		-------
-		b: torch.Tensor, shape=(-1, length, self.k)
+		b: torch.Tensor, shape=(-1, length, self.n_nodes)
 			The log probabilities calculated by the backward algorithm.
 		"""
 
-		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
-		n, k, d = X.shape
+		n, l, _ = emissions.shape
 
-		b = torch.full((k, n, self.n_nodes), -inf, dtype=torch.float32,
+		b = torch.full((l, n, self.n_nodes), -inf, dtype=torch.float32,
 			device=self.device)
 		b[-1] = self.ends
 
-		for i in range(k-2, -1, -1):
+		for i in range(l-2, -1, -1):
 			p = b[i+1, :, self._edge_idx_ends]
-			p += emissions[i+1, self._edge_idx_ends].T + priors[:, i+1, self._edge_idx_ends]
+			p += emissions[:, i+1, self._edge_idx_ends] + priors[:, i+1, self._edge_idx_ends]
 			p += self._edge_log_probs.expand(n, -1)
 
 			alpha = torch.max(p, dim=1, keepdims=True).values
@@ -296,7 +297,8 @@ class _SparseHMM(Distribution):
 		b = b.permute(1, 0, 2)
 		return b
 
-	def forward_backward(self, X, priors=None, emissions=None):
+	@torch.inference_mode()
+	def forward_backward(self, emissions, priors):
 		"""Run the forward-backward algorithm on some data.
 
 		Runs the forward-backward algorithm on a batch of sequences. This
@@ -312,42 +314,39 @@ class _SparseHMM(Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
-			A set of examples to evaluate. 		
+		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.	
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+		priors: torch.Tensor, shape=(-1, -1, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.k)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
-
 
 		Returns
 		-------
-		transitions: torch.Tensor, shape=(-1, n_nodes, n_nodes) or (-1, n_edges)
+		transitions: torch.Tensor, shape=(-1, self.n_nodes, self.n_nodes)
 			The expected number of transitions across each edge that occur
 			for each example. The returned transitions follow the structure
 			of the transition matrix and so will be dense or sparse as
 			appropriate.
 
-		emissions: torch.Tensor, shape=(-1, length, n_nodes)
+		responsibility: torch.Tensor, shape=(-1, -1, self.n_nodes)
 			The posterior probabilities of each observation belonging to each
 			state given that one starts at the beginning of the sequence,
 			aligns observations across all paths to get to the current
 			observation, and then proceeds to align all remaining observations
 			until the end of the sequence.
 
-		starts: torch.Tensor, shape=(-1, n_nodes)
+		starts: torch.Tensor, shape=(-1, self.n_nodes)
 			The probabilities of starting at each node given the 
 			forward-backward algorithm.
 
-		ends: torch.Tensor, shape=(-1, n_nodes)
+		ends: torch.Tensor, shape=(-1, self.n_nodes)
 			The probabilities of ending at each node given the forward-backward
 			algorithm.
 
@@ -355,29 +354,26 @@ class _SparseHMM(Distribution):
 			The log probabilities of each sequence given the model.
 		"""
 
-		X, priors, emissions = _check_hmm_inputs(self, X, priors, emissions)
-		n, k, d = X.shape
-
-		f = self.forward(X, priors=priors, emissions=emissions)
-		b = self.backward(X, priors=priors, emissions=emissions)
+		n, l, _ = emissions.shape
+		f = self.forward(emissions, priors=priors)
+		b = self.backward(emissions, priors=priors)
 
 		logp = torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
 		t = f[:, :-1, self._edge_idx_starts] + b[:, 1:, self._edge_idx_ends]
-		t += emissions[1:, self._edge_idx_ends].permute(2, 0, 1) + priors[:, 1:, self._edge_idx_ends]
-		t += self._edge_log_probs.expand(n, k-1, -1)
+		t += emissions[:, 1:, self._edge_idx_ends] + priors[:, 1:, self._edge_idx_ends]
+		t += self._edge_log_probs.expand(n, l-1, -1)
+		t = torch.exp(torch.logsumexp(t, dim=1).T - logp).T
 
-		starts = self.starts + emissions[0].T + priors[:, 0] + b[:, 0]
+		starts = self.starts + emissions[:, 0] + priors[:, 0] + b[:, 0]
 		starts = torch.exp(starts.T - torch.logsumexp(starts, dim=-1)).T
 
 		ends = self.ends + f[:, -1]
 		ends = torch.exp(ends.T - torch.logsumexp(ends, dim=-1)).T
 
-		expected_transitions = torch.exp(torch.logsumexp(t, dim=1).T - logp).T
-
-		fb = f + b
-		fb = (fb - torch.logsumexp(fb, dim=2).reshape(len(X), -1, 1))
-		return expected_transitions, fb, starts, ends, logp
+		r = f + b
+		r = (r - torch.logsumexp(r, dim=2).reshape(n, -1, 1))
+		return t, r, starts, ends, logp
 
 	def _labeled_summarize(self, X, y):
 		"""Extract sufficient statistics given a set of labels.
@@ -404,7 +400,7 @@ class _SparseHMM(Distribution):
 			max_value=self.n_nodes-1, dtypes=(torch.int32, torch.int64),
 			shape=(X.shape[0], X.shape[1]))
 
-		n, k, d = X.shape
+		n, l, d = X.shape
 
 		starts = torch.zeros(n, self.n_nodes, device=self.device)
 		starts[torch.arange(n), y[:, 0]] = 1 
@@ -412,28 +408,29 @@ class _SparseHMM(Distribution):
 		ends = torch.zeros_like(starts)
 		ends[torch.arange(n), y[:, -1]] = 1
 
-		trans = torch.zeros((n, self.n_edges), device=self.device)
-		emissions = torch.zeros(n, k, self.n_nodes, device=self.device) - inf
+		t = torch.zeros((n, self.n_edges), device=self.device)
+		r = torch.zeros(n, k, self.n_nodes, device=self.device) - inf
 
 		for i in range(n):
-			for j in range(k-1):
+			for j in range(l-1):
 				edge = y[i, j].item(), y[i, j+1].item()
 				idx = self._edge_keymap[edge]
 				
-				trans[i][idx] += 1
-				emissions[i, j, y[i, j]] = 0
+				t[i][idx] += 1
+				r[i, j, y[i, j]] = 0
 
-			emissions[i, k-1, y[i, k-1]] = 0
+			r[i, k-1, y[i, k-1]] = 0
 
 		if self._initialized:
 			logps = self.log_probability(X)
 		else:
 			logps = torch.zeros(n, device=self.device)
 
-		return trans, emissions, starts, ends, logps
+		return t, r, starts, ends, logps
 
 
-	def summarize(self, X, y=None, sample_weight=None, priors=None):
+	def summarize(self, X, y=None, sample_weight=None, emissions=None, 
+		priors=None):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
@@ -458,6 +455,13 @@ class _SparseHMM(Distribution):
 			A set of weights for the examples. This can be either of shape
 			(-1, self.d) or a vector of shape (-1,). Default is ones.
 
+
+		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.	
+
 		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
@@ -466,20 +470,19 @@ class _SparseHMM(Distribution):
 		"""
 
 		if y is None:
-			trans, emissions, starts, ends, logps = self.forward_backward(X, 
+			t, r, starts, ends, logps = self.forward_backward(emissions, 
 				priors=priors)
 		else:
-			trans, emissions, starts, ends, logps = self._labeled_summarize(X, 
-				y=y)
+			t, r, starts, ends, logps = self._labeled_summarize(X, y=y)
 
 		self._xw_starts_sum += torch.sum(starts * sample_weight, dim=0)
 		self._xw_ends_sum += torch.sum(ends * sample_weight, dim=0)
-		self._xw_sum += torch.sum(trans * sample_weight, dim=0) 
+		self._xw_sum += torch.sum(t * sample_weight, dim=0) 
 
 		X = X.reshape(-1, X.shape[-1])
-		emissions = torch.exp(emissions) * sample_weight.unsqueeze(1)
+		r = torch.exp(r) * sample_weight.unsqueeze(1)
 		for i, node in enumerate(self.nodes):
-			w = emissions[:, :, i].reshape(-1, 1)
+			w = r[:, :, i].reshape(-1, 1)
 			node.distribution.summarize(X, sample_weight=w)
 
 		return logps

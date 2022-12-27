@@ -103,7 +103,7 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 	dtypes: tuple or list or set or None, optional
 		The set of dtypes that the parameter can take. Default is None.
 
-	ndim: int or None, optional
+	ndim: int or list or tuple or None, optional
 		The number of dimensions of the tensor. Should not be used when the
 		parameter is a single value. Default is None.
 
@@ -178,9 +178,14 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 
 	if ndim is not None:
 		if isinstance(parameter, vector):
-			if len(parameter.shape) != ndim:
-				raise ValueError("Parameter {} must have {} dims".format(
-					name, ndim))
+			if isinstance(ndim, int):
+				if len(parameter.shape) != ndim:
+					raise ValueError("Parameter {} must have {} dims".format(
+						name, ndim))
+			else:
+				if len(parameter.shape) not in ndim:
+					raise ValueError("Parameter {} must have {} dims".format(
+						name, ndim))
 		else:
 			if ndim != 0:
 				raise ValueError("Parameter {} must have {} dims".format(
@@ -261,33 +266,23 @@ def _reshape_weights(X, sample_weight, device='cpu'):
 	"""
 
 	if sample_weight is None:
-		return torch.ones(1, device=device).expand_as(X)
-	
+		sample_weight = torch.ones(1, device=device).expand(*X.shape)
+
 	if len(sample_weight.shape) == 1: 
 		sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[1])
+		_check_parameter(sample_weight, "sample_weight", min_value=0)
+
 	elif sample_weight.shape[1] == 1:
 		sample_weight = sample_weight.expand(-1, X.shape[1])
+		_check_parameter(sample_weight, "sample_weight", min_value=0)
 
-	_check_parameter(sample_weight, "sample_weight", min_value=0, 
-		shape=X.shape, ndim=2)
+	if isinstance(X, torch.masked.MaskedTensor):
+		if not isinstance(sample_weight, torch.masked.MaskedTensor):
+			sample_weight = torch.masked.MaskedTensor(sample_weight, 
+				mask=X._masked_mask)
 
+	_check_parameter(sample_weight, "sample_weight", shape=X.shape, ndim=2)
 	return sample_weight
-
-
-def _check_hmm_inputs(model, X, priors, emissions):
-	X = _cast_as_tensor(X)
-	n, k, d = X.shape
-
-	if priors is None:
-		priors = torch.zeros(1, device=model.device).expand(n, k, model.n_nodes)
-
-	if emissions is None:
-		emissions = torch.empty((k, model.n_nodes, n), dtype=torch.float32, requires_grad=False, device=model.device)
-		for i, node in enumerate(model.nodes):
-			emissions[:, i] = node.distribution.log_probability(X.reshape(
-				-1, d)).reshape(n, k).T
-
-	return X, priors, emissions
 
 
 def _initialize_centroids(X, k, algorithm='first-k', random_state=None):

@@ -40,6 +40,25 @@ def X():
 
 
 @pytest.fixture
+def X_masked(X):
+	mask = torch.tensor(numpy.array([
+		[False, True,  True ],
+		[True,  True,  False],
+		[False, False, False],
+		[True,  True,  True ],
+		[False, True,  False],
+		[True,  True,  True ],
+		[False, False, False],
+		[True,  False, True ],
+		[True,  True,  True ],
+		[True,  True,  True ],
+		[True,  False, True ]]))
+
+	X = torch.tensor(numpy.array(X))
+	return torch.masked.MaskedTensor(X, mask=mask)
+
+
+@pytest.fixture
 def w():
 	return [[1], [2], [0], [0], [5], [1], [2], [1], [1], [2], [0]]
 
@@ -612,4 +631,139 @@ def test_serialization(X, model):
 
 	assert_array_almost_equal(m1d1.scales, m2d1.scales)
 	assert_array_almost_equal(m1d2.scales, m2d2.scales)
-	
+
+
+def test_masked_probability(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	y = [1.668138e-02, 1.911842e-02, 4.393471e-03, 1.633741e-03,
+           9.786682e-02, 1.229918e-04, 1.585297e-01, 6.066021e-03,
+           2.571130e-01, 9.765117e-03, 1.114044e+01]
+
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	assert_array_almost_equal(y, model.probability(X_), 5)
+
+	y =  [5.277007e-02, 1.175627e+00, 1.000000e+00, 1.633741e-03,
+           1.533307e-01, 1.229918e-04, 1.000000e+00, 1.880462e-02,
+           2.571130e-01, 9.765117e-03, 3.424242e+00]
+
+	assert_array_almost_equal(y, model.probability(X_masked), 5)
+
+
+def test_masked_log_probability(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	y = [-4.09346, -3.9571 , -5.42764, -6.41688, -2.32415, -9.00339,
+           -1.84181, -5.10505, -1.35824, -4.62894,  2.41058]
+
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	assert_array_almost_equal(y, model.log_probability(X_), 5)
+
+	y = [-2.94181,  0.1618 ,  0.     , -6.41688, -1.87516, -9.00339,
+            0.     , -3.97365, -1.35824, -4.62894,  1.23088]
+
+	assert_array_almost_equal(y, model.log_probability(X_masked), 5)
+
+
+def test_masked_emission_matrix(model, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	e = model._emission_matrix(X_)
+
+	assert_array_almost_equal(e, 
+		[[ -4.7349,  -4.8411],
+         [ -7.5921,  -3.9838],
+         [-21.4016,  -5.4276],
+         [-25.2111,  -6.4169],
+         [ -2.3540,  -5.8519],
+         [-43.3063,  -9.0034],
+         [ -1.8778,  -5.1852],
+         [-18.0682,  -5.1051],
+         [ -1.4016,  -4.5185],
+         [-14.2587,  -4.6290],
+         [  2.4079,  -3.5293]], 4)
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d)
+	e = model._emission_matrix(X_masked)
+
+	assert_array_almost_equal(e, 
+		[[ -3.8533,  -3.2582],
+         [ -0.2311,  -2.2300],
+         [ -0.6931,  -0.6931],
+         [-25.5476,  -5.9061],
+         [ -2.8225,  -2.1471],
+         [-43.6428,  -8.4926],
+         [ -0.6931,  -0.6931],
+         [-19.6087,  -3.4628],
+         [ -1.7381,  -4.0077],
+         [-14.5952,  -4.1182],
+         [  0.8675,  -1.8871]], 4)
+
+
+def test_masked_summarize(model, X, X_masked, w, y):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d, priors=[0.7, 0.3])
+	model.summarize(X_, y, sample_weight=w)
+	assert_array_almost_equal(model._w_sum, [7.0, 8.0])
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d, priors=[0.7, 0.3])
+	model.summarize(X_masked, y, sample_weight=w)
+	assert_array_almost_equal(model._w_sum, [5.0, 8.0])
+
+
+def test_masked_from_summaries(model, X, X_masked, y):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	model.summarize(X_, y)
+	model.from_summaries()
+
+	assert_array_almost_equal(model._w_sum, [0., 0.])
+	assert_array_almost_equal(model.priors, [0.545455, 0.454545])
+	assert_array_almost_equal(model._log_priors, 
+		numpy.log([0.545455, 0.454545]))
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d, priors=[0.7, 0.3])
+	model.summarize(X_masked, y, sample_weight=w)
+	model.from_summaries()
+
+	assert_array_almost_equal(model._w_sum, [0., 0.])
+	assert_array_almost_equal(model.priors, [0.444444, 0.555556])
+	assert_array_almost_equal(model._log_priors, 
+		numpy.log([0.444444, 0.555556]))
+
+
+def test_masked_fit(X, X_masked, y):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = [Exponential([2.1, 0.3, 1.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d)
+	model.fit(X_, y)
+
+	assert_array_almost_equal(model._w_sum, [0., 0.])
+	assert_array_almost_equal(model.priors, [0.545455, 0.454545])
+	assert_array_almost_equal(model._log_priors, 
+		numpy.log([0.545455, 0.454545]))
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = BayesClassifier(d)
+	model.fit(X_masked, y)
+
+	assert_array_almost_equal(model._w_sum, [0., 0.])
+	assert_array_almost_equal(model.priors, [0.444444, 0.555556])
+	assert_array_almost_equal(model._log_priors, 
+		numpy.log([0.444444, 0.555556]))

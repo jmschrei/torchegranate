@@ -35,6 +35,21 @@ def X():
 
 
 @pytest.fixture
+def X_masked(X):
+	mask = torch.tensor(numpy.array([
+		[False, True,  True ],
+		[True,  True,  False],
+		[False, False, False],
+		[True,  True,  True ],
+		[False, True,  False],
+		[True,  True,  True ],
+		[True,  False, True ]]))
+
+	X = torch.tensor(numpy.array(X))
+	return torch.masked.MaskedTensor(X, mask=mask)
+
+
+@pytest.fixture
 def X2():
 	return [[1.2, 0.5, 1.1, 1.9],
 	     [6.2, 1.1, 2.4, 1.1]] 
@@ -820,3 +835,88 @@ def test_serialization(X):
 	assert_array_almost_equal(d2._w_sum, [3., 3., 3.])
 	assert_array_almost_equal(d2._xw_sum, [10., 3., 4.])
 	assert_array_almost_equal(d.log_probability(X), d2.log_probability(X))
+
+
+def test_masked_probability(lambdas, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	y = [0.011852, 0.012803, 0.029038, 0.01568 , 0.003161, 0.000184,
+           0.007901]
+
+	d = Poisson(lambdas)
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	assert_array_almost_equal(y, d.probability(X_)._masked_data)
+
+	y =  [3.279189e-02, 4.978707e-02, 1.000000e+00, 1.568029e-02,
+           2.975380e-01, 1.844002e-04, 2.655589e-02]
+
+	assert_array_almost_equal(y, d.probability(X_masked)._masked_data)
+
+
+def test_masked_log_probability(lambdas, X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	y = [-4.435252, -4.358063, -3.539164, -4.155351, -5.757008, -8.598402,
+           -4.840717]
+
+	d = Poisson(lambdas)
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	assert_array_almost_equal(y, d.log_probability(X_)._masked_data)
+
+	y = [-3.417574, -3.      ,  0.      , -4.155351, -1.212213, -8.598402,
+           -3.628504]
+
+	assert_array_almost_equal(y, d.log_probability(X_masked)._masked_data)
+
+
+def test_masked_summarize(X, X_masked, w):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = Poisson()
+	d.summarize(X, sample_weight=w)
+	assert_array_almost_equal(d._w_sum, [11.0, 11.0, 11.0])
+	assert_array_almost_equal(d._xw_sum, [25.0, 10.0, 6.0])
+
+	d = Poisson()
+	d.summarize(X_masked)
+	assert_array_almost_equal(d._w_sum, [4.0, 5.0, 4.0])
+	assert_array_almost_equal(d._xw_sum, [9.0, 6.0, 6.0])
+
+
+def test_masked_from_summaries(X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = Poisson()
+	d.summarize(X_)
+	d.from_summaries()
+	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
+			[2.      , 1.142857, 1.285714])
+
+	d = Poisson()
+	d.summarize(X_masked)
+	d.from_summaries()
+	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
+			[2.25, 1.2 , 1.5])
+
+
+def test_masked_fit(X, X_masked):
+	X = torch.tensor(numpy.array(X))
+	mask = torch.ones_like(X).type(torch.bool)
+	X_ = torch.masked.MaskedTensor(X, mask=mask)
+
+	d = Poisson()
+	d.fit(X_)
+	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
+			[2.      , 1.142857, 1.285714])
+
+	d = Poisson()
+	d.fit(X_masked)
+	_test_efd_from_summaries(d, "lambdas", "_log_lambdas", 
+			[2.25, 1.2 , 1.5])
+	

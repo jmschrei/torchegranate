@@ -38,6 +38,21 @@ def X():
 
 
 @pytest.fixture
+def X_masked(X):
+	mask = torch.tensor(numpy.array([
+		[False, True,  True ],
+		[True,  True,  False],
+		[False, False, False],
+		[True,  True,  True ],
+		[False, True,  False],
+		[True,  True,  True ],
+		[True,  False, True ]]))
+
+	X = torch.tensor(numpy.array(X))
+	return torch.masked.MaskedTensor(X, mask=mask)
+
+
+@pytest.fixture
 def w():
 	return [[1], [2], [0], [0], [5], [1], [2]]
 

@@ -101,8 +101,8 @@ class KMeans(torch.nn.Module):
 		if self.k is None and self.centroids is None:
 			raise ValueError("Must specify one of `k` or `centroids`.")
 
-		self.k = len(centroids) if centroids else self.k
-		self.d = len(centroids[0]) if centroids else None
+		self.k = len(centroids) if centroids is not None else self.k
+		self.d = len(centroids[0]) if centroids is not None else None
 		self._initialized = centroids is not None
 		self._reset_cache()
 
@@ -131,6 +131,9 @@ class KMeans(torch.nn.Module):
 		centroids = _initialize_centroids(X, self.k, algorithm=self.init, 
 			random_state=self.random_state)
 		
+		if isinstance(centroids, torch.masked.MaskedTensor):
+			centroids = centroids._masked_data * centroids._masked_mask
+
 		if centroids.device != self.device:
 			centroids = centroids.to(self.device)
 
@@ -157,7 +160,7 @@ class KMeans(torch.nn.Module):
 		self.register_buffer("_xw_sum", torch.zeros(self.k, self.d,
 			device=self.device))
 		self.register_buffer("_centroid_sum", torch.sum(self.centroids**2, 
-			axis=1).unsqueeze(0))
+			dim=1).unsqueeze(0))
 
 	def _distances(self, X):
 		"""Calculate the distances between each example and each centroid.
@@ -182,11 +185,19 @@ class KMeans(torch.nn.Module):
 		X = _check_parameter(_cast_as_tensor(X, dtype=torch.float32), "X", 
 			ndim=2, shape=(-1, self.d))
 
-		XX = torch.sum(X**2, axis=1).unsqueeze(1)
-		Xc = torch.matmul(X, self.centroids.T)
+		XX = torch.sum(X**2, dim=1).unsqueeze(1)
+
+		if isinstance(X, torch.masked.MaskedTensor):
+			n = X._masked_mask.sum(dim=1).unsqueeze(1)
+			Xc = torch.matmul(X._masked_data * X._masked_mask, self.centroids.T)
+		else:
+			n = X.shape[1]
+			Xc = torch.matmul(X, self.centroids.T)
 		
-		d = torch.clamp(XX - 2*Xc + self._centroid_sum, min=0)
-		return torch.sqrt(d)
+		distances = torch.empty(X.shape[0], self.k, dtype=X.dtype, 
+			device=self.device)
+		distances[:] = torch.clamp(XX - 2*Xc + self._centroid_sum, min=0)
+		return torch.sqrt(distances / n)
 
 	def predict(self, X):
 		"""Calculate the cluster assignment for each example.
@@ -207,7 +218,7 @@ class KMeans(torch.nn.Module):
 			The predicted label for each example.
 		"""
 
-		return self._distances(X).argmin(axis=1)
+		return self._distances(X).argmin(dim=1)
 
 	def summarize(self, X, sample_weight=None):
 		"""Extract the sufficient statistics from a batch of data.
@@ -245,10 +256,21 @@ class KMeans(torch.nn.Module):
 			dtype=torch.float32), device=self.device)
 
 		distances = self._distances(X)
-		y_hat = distances.argmin(dim=1).unsqueeze(1).expand(-1, self.d)
+		y_hat = distances.argmin(dim=1)
 
-		self._w_sum.scatter_add_(0, y_hat, sample_weight)
-		self._xw_sum.scatter_add_(0, y_hat, X * sample_weight)
+		if isinstance(X, torch.masked.MaskedTensor):
+			for i in range(self.k):
+				idx = y_hat == i
+
+				self._w_sum[i][:] = self._w_sum[i] + sample_weight[idx].sum(dim=0)
+				self._xw_sum[i][:] = self._xw_sum[i] + (X[idx] * 
+					sample_weight[idx]).sum(dim=0)
+
+		else:
+			y_hat = y_hat.unsqueeze(1).expand(-1, self.d)
+			self._w_sum.scatter_add_(0, y_hat, sample_weight)
+			self._xw_sum.scatter_add_(0, y_hat, X * sample_weight)
+		
 		return distances.min(dim=1).values.sum()
 
 	def from_summaries(self):

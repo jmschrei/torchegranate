@@ -466,6 +466,64 @@ def test_check_parameters_ndim_2():
 	assert_raises(ValueError, _check_parameter, x, "x", ndim=0)
 
 
+def test_check_parameters_ndim_tuple():
+	x = torch.tensor([1.1])
+
+	_check_parameter(x, "x", ndim=(1,))
+	_check_parameter(x, "x", ndim=(0, 1))
+	_check_parameter(x, "x", ndim=(1, 2))
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=0)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=(0, 2))
+
+	x = torch.tensor(1.1)
+
+	_check_parameter(x, "x", ndim=(0,))
+	_check_parameter(x, "x", ndim=(0, 1))
+	_check_parameter(x, "x", ndim=(0, 2))
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=(1, 2))
+
+	x = torch.tensor([[1.1]])
+
+	_check_parameter(x, "x", ndim=(2,))
+	_check_parameter(x, "x", ndim=(2, 1))
+	_check_parameter(x, "x", ndim=(0, 2))
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=(0, 1))
+
+
+def test_check_parameters_ndim_list():
+	x = torch.tensor([1.1])
+
+	_check_parameter(x, "x", ndim=[1])
+	_check_parameter(x, "x", ndim=[0, 1])
+	_check_parameter(x, "x", ndim=[1, 2])
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=0)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=[0, 2])
+
+	x = torch.tensor(1.1)
+
+	_check_parameter(x, "x", ndim=[0])
+	_check_parameter(x, "x", ndim=[0, 1])
+	_check_parameter(x, "x", ndim=[0, 2])
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=[1, 2])
+
+	x = torch.tensor([[1.1]])
+
+	_check_parameter(x, "x", ndim=[2])
+	_check_parameter(x, "x", ndim=[2, 1])
+	_check_parameter(x, "x", ndim=[0, 2])
+
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=1)
+	assert_raises(ValueError, _check_parameter, x, "x", ndim=[0, 1])
+
+
 def test_check_parameters_shape():
 	x = torch.tensor([[1.1]])
 

@@ -59,8 +59,8 @@ class Categorical(Distribution):
 			min_value=0, max_value=1, ndim=2)
 
 		self._initialized = probs is not None
-		self.d = self.probs.shape[0] if self._initialized else None
-		self.n_keys = self.probs.shape[1] if self._initialized else None
+		self.d = self.probs.shape[-2] if self._initialized else None
+		self.n_keys = self.probs.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d, n_keys):

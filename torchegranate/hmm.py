@@ -42,6 +42,28 @@ def _cast_distributions(distributions):
 	return nodes
 
 
+def _check_inputs(model, X, priors, emissions):
+	if X is None and emissions is None:
+		raise ValueError("Must pass in one of `X` or `emissions`.")
+
+	X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+		shape=(-1, -1, model.d))
+	n = X.shape[0] if X is not None else -1
+	k = X.shape[1] if X is not None else -1
+
+	emissions = _check_parameter(_cast_as_tensor(emissions), "emissions", 
+		ndim=3, shape=(n, k, model.n_nodes))
+	if emissions is None:
+		emissions = model._emission_matrix(X)
+
+	priors = _check_parameter(_cast_as_tensor(priors), "priors", ndim=3,
+		shape=(n, k, model.n_nodes))
+	if priors is None:
+		priors = torch.zeros(1, device=model.device).expand_as(emissions)
+
+	return emissions, priors
+
+
 class HiddenMarkovModel(GraphMixin, Distribution):
 	"""A hidden Markov model.
 
@@ -299,13 +321,19 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		n, k, _ = X.shape
 		X = X.reshape(-1, self.d)
 
-		e = torch.empty((k, self.n_nodes, n), dtype=torch.float32)
+		e = torch.empty((k, self.n_nodes, n), dtype=torch.float32, 
+			requires_grad=False, device=self.device)
+		
 		for i, node in enumerate(self.nodes):
-			e[:, i] = node.distribution.log_probability(X).reshape(n, k).T
+			logp = node.distribution.log_probability(X)
+			if isinstance(logp, torch.masked.MaskedTensor):
+				logp = logp._masked_data
+
+			e[:, i] = logp.reshape(n, k).T
 
 		return e.permute(2, 0, 1)
 
-	def forward(self, X, priors=None, emissions=None):
+	def forward(self, X=None, emissions=None, priors=None, check_inputs=True):
 		"""Run the forward algorithm on some data.
 
 		Runs the forward algorithm on a batch of sequences. This is not to be
@@ -317,31 +345,43 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			A set of examples to evaluate. 		
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
-
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
+
 
 		Returns
 		-------
-		f: torch.Tensor, shape=(-1, len, self.n_nodes)
+		f: torch.Tensor, shape=(-1, -1, self.n_nodes)
 			The log probabilities calculated by the forward algorithm.
 		"""
 
-		return self._model.forward(X, priors=priors, emissions=emissions)
+		if check_inputs:
+			emissions, priors = _check_inputs(self, X, emissions, priors) 
+		else:
+			if X is None:
+				raise ValueError("Must check inputs if not passing in "
+					"a pre-calculated emission matrix.")
 
-	def backward(self, X, priors=None, emissions=None):
+		return self._model.forward(emissions, priors=priors)
+
+	def backward(self, X, emissions=None, priors=None, check_inputs=True):
 		"""Run the backward algorithm on some data.
 
 		Runs the backward algorithm on a batch of sequences. This is not to be
@@ -354,20 +394,25 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			A set of examples to evaluate. 		
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
 
 
 		Returns
@@ -376,9 +421,17 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			The log probabilities calculated by the backward algorithm.
 		"""
 
-		return self._model.backward(X, priors=priors, emissions=emissions)
+		if check_inputs:
+			emissions, priors = _check_inputs(self, X, emissions, priors) 
+		else:
+			if X is None:
+				raise ValueError("Must check inputs if not passing in "
+					"a pre-calculated emission matrix.")
 
-	def forward_backward(self, X, priors=None, emissions=None):
+		return self._model.backward(emissions, priors=priors)
+
+	def forward_backward(self, X, priors=None, emissions=None, 
+		check_inputs=True):
 		"""Run the forward-backward algorithm on some data.
 
 		Runs the forward-backward algorithm on a batch of sequences. This
@@ -394,20 +447,25 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			A set of examples to evaluate. 		
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
 
 
 		Returns
@@ -437,10 +495,16 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			The log probabilities of each sequence given the model.
 		"""
 
-		return self._model.forward_backward(X, priors=priors, 
-			emissions=emissions)
+		if check_inputs:
+			emissions, priors = _check_inputs(self, X, emissions, priors) 
+		else:
+			if X is None:
+				raise ValueError("Must check inputs if not passing in "
+					"a pre-calculated emission matrix.")
 
-	def log_probability(self, X, priors=None):
+		return self._model.forward_backward(emissions, priors=priors)
+
+	def log_probability(self, X, priors=None, check_inputs=True):
 		"""Calculate the log probability of each example.
 
 		This method calculates the log probability of each example given the
@@ -459,6 +523,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
+
 
 		Returns
 		-------
@@ -466,7 +534,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			The log probability of each example.
 		"""
 
-		f = self.forward(X, priors=priors)
+		f = self.forward(X, priors=priors, check_inputs=check_inputs)
 		return torch.logsumexp(f[:, -1] + self._model.ends, dim=1)
 
 	def predict_log_proba(self, X, priors=None):
@@ -491,13 +559,13 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		y: torch.Tensor, shape=(-1, len, self.n_nodes)
+		r: torch.Tensor, shape=(-1, len, self.n_nodes)
 			The log posterior probabilities for each example under each 
 			component as calculated by the forward-backward algorithm.
 		"""
 
-		_, fb, _, _, _ = self._model.forward_backward(X, priors=priors)
-		return fb
+		_, r, _, _, _ = self.forward_backward(X, priors=priors)
+		return r
 
 	def predict_proba(self, X, priors=None):
 		"""Calculate the posterior probabilities for each example.
@@ -627,7 +695,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self._reset_cache()
 		return self
 
-	def summarize(self, X, y=None, sample_weight=None, priors=None):
+	def summarize(self, X, y=None, sample_weight=None, emissions=None, 
+		priors=None):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
@@ -652,6 +721,12 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			A set of weights for the examples. This can be either of shape
 			(-1, length, self.d) or a vector of shape (-1,). Default is ones.
 
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
+			Precalculated emission log probabilities. These are the
+			probabilities of each observation under each probability 
+			distribution. When running some algorithms it is more efficient
+			to precalculate these and pass them into each call.
+
 		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
@@ -665,21 +740,23 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			The log probability of each example.
 		"""
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+			shape=(-1, -1, self.d))
+		emissions, priors = _check_inputs(self, X, emissions, priors)
 		
 		if sample_weight is None:
 			sample_weight = torch.ones(1, device=self.device).expand(
-				X.shape[0], 1)
+				emissions.shape[0], 1)
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight),
 				"sample_weight", min_value=0., ndim=1, 
-				shape=(len(X),)).reshape(-1, 1)
+				shape=(emissions.shape[0],)).reshape(-1, 1)
 
 		if not self._initialized and y is None:
 			self._initialize(X, sample_weight=sample_weight)
 
-		return self._model.summarize(X, y=y, sample_weight=sample_weight, 
-			priors=priors)
+		return self._model.summarize(X, y=y, 
+			sample_weight=sample_weight, emissions=emissions, priors=priors)
 
 	def from_summaries(self):
 		"""Update the model parameters given the extracted statistics.

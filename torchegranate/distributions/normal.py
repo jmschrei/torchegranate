@@ -75,12 +75,10 @@ class Normal(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Normal"
 
-		ndim = 1 if covariance_type in ('diag', 'sphere') else 2
-
 		self.means = _check_parameter(_cast_as_parameter(means), "means", 
 			ndim=1)
 		self.covs = _check_parameter(_cast_as_parameter(covs), "covs", 
-			ndim=ndim)
+			ndim=(1, 2))
 
 		_check_shapes([self.means, self.covs], ["means", "covs"])
 
@@ -88,7 +86,7 @@ class Normal(Distribution):
 		self.covariance_type = covariance_type
 
 		self._initialized = (means is not None) and (covs is not None)
-		self.d = len(means) if self._initialized else None
+		self.d = self.means.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
@@ -232,9 +230,10 @@ class Normal(Distribution):
 			self._xxw_sum += torch.matmul((X * sample_weight).T, X)
 
 		elif self.covariance_type in ('diag', 'sphere'):
-			self._w_sum += torch.sum(sample_weight, dim=0)
-			self._xw_sum += torch.sum(X * sample_weight, dim=0)
-			self._xxw_sum += torch.sum(X ** 2 * sample_weight, dim=0)
+			self._w_sum[:] = self._w_sum + torch.sum(sample_weight, dim=0)
+			self._xw_sum[:] = self._xw_sum + torch.sum(X * sample_weight, dim=0)
+			self._xxw_sum[:] = self._xxw_sum + torch.sum(X ** 2 * 
+				sample_weight, dim=0)
 
 	def from_summaries(self):
 		"""Update the model parameters given the extracted statistics.

@@ -54,7 +54,7 @@ class Poisson(Distribution):
 			min_value=0, ndim=1)
 
 		self._initialized = lambdas is not None
-		self.d = len(self.lambdas) if self._initialized else None
+		self.d = self.lambdas.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
@@ -151,8 +151,8 @@ class Poisson(Distribution):
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		X = _check_parameter(X, "X", min_value=0)
 
-		self._w_sum += torch.sum(sample_weight, dim=0)
-		self._xw_sum += torch.sum(X * sample_weight, dim=0)
+		self._w_sum[:] = self._w_sum + torch.sum(sample_weight, dim=0)
+		self._xw_sum[:] = self._xw_sum + torch.sum(X * sample_weight, dim=0)
 
 	def from_summaries(self):
 		"""Update the model parameters given the extracted statistics.

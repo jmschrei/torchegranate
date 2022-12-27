@@ -247,11 +247,13 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		logp = torch.logsumexp(e, dim=1, keepdims=True)
 		y = torch.exp(e - logp)
 
+		z = torch.clone(self._w_sum)
+
 		for i, d in enumerate(self.distributions):
 			d.summarize(X, y[:, i:i+1] * sample_weight)
 
 			if self.frozen == False:
-				self._w_sum[i] += (y[:, i:i+1] * 
+				self._w_sum[i] = self._w_sum[i] + (y[:, i:i+1] * 
 					sample_weight).mean(dim=-1).sum()
 
 		return torch.sum(logp)

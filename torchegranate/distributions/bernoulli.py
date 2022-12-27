@@ -54,7 +54,7 @@ class Bernoulli(Distribution):
 			min_value=eps, max_value=1-eps, ndim=1)
 
 		self._initialized = self.probs is not None
-		self.d = len(self.probs) if self._initialized else None
+		self.d = self.probs.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
@@ -92,7 +92,7 @@ class Bernoulli(Distribution):
 		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
 		self.register_buffer("_log_probs", torch.log(self.probs))
-		self.register_buffer("_log_inv_probs", torch.log(1-self.probs))
+		self.register_buffer("_log_inv_probs", torch.log(-(self.probs-1)))
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

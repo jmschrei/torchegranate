@@ -62,7 +62,7 @@ class Uniform(Distribution):
 		_check_shapes([self.mins, self.maxs], ["mins", "maxs"])
 
 		self._initialized = (mins is not None) and (maxs is not None)
-		self.d = len(self.mins) if self._initialized else None
+		self.d = self.mins.shape[-1] if self._initialized else None
 		self._reset_cache()
 
 	def _initialize(self, d):
