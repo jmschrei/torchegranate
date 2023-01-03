@@ -10,6 +10,30 @@ from apricot import FeatureBasedSelection
 
 eps = torch.finfo(torch.float32).eps
 
+class BufferList(torch.nn.Module):
+	"""A buffer list."""
+
+	def __init__(self, buffers):
+		super(BufferList, self).__init__()
+
+		self.buffers = []
+		for i, b in enumerate(buffers):
+			name = "_buffer_{}".format(i)
+			
+			self.register_buffer(name, b)
+			self.buffers.append(getattr(self, name))
+
+	def __repr__(self):
+		return str(self.buffers)
+
+	def __getitem__(self, i):
+		return self.buffers[i]
+
+	@property
+	def dtype(self):
+		return self.buffers[0].dtype
+
+
 def _cast_as_tensor(value, dtype=None):
 	"""Set the parameter.""" 
 
@@ -281,7 +305,7 @@ def _reshape_weights(X, sample_weight, device='cpu'):
 			sample_weight = torch.masked.MaskedTensor(sample_weight, 
 				mask=X._masked_mask)
 
-	_check_parameter(sample_weight, "sample_weight", shape=X.shape, ndim=2)
+	_check_parameter(sample_weight, "sample_weight", shape=X.shape, ndim=X.ndim)
 	return sample_weight
 
 

@@ -27,17 +27,17 @@ inf = float("inf")
 
 @pytest.fixture
 def X():
-	return [[1, 2, 0, 0],
-	     [0, 0, 1, 1],
-	     [1, 1, 2, 0],
-	     [2, 2, 2, 1],
-	     [0, 1, 0, 0],
-	     [1, 1, 0, 1],
-	     [2, 1, 0, 1],
-	     [1, 0, 2, 1],
-	     [1, 1, 0, 0],
-	     [0, 2, 1, 0],
-	     [0, 0, 0, 0]]
+	return [[[1], [2], [0], [0]],
+	     [[0], [0], [1], [1]],
+	     [[1], [1], [2], [0]],
+	     [[2], [2], [2], [1]],
+	     [[0], [1], [0], [0]],
+	     [[1], [1], [0], [1]],
+	     [[2], [1], [0], [1]],
+	     [[1], [0], [2], [1]],
+	     [[1], [1], [0], [0]],
+	     [[0], [2], [1], [0]],
+	     [[0], [0], [0], [0]]]
 
 
 @pytest.fixture
@@ -49,12 +49,12 @@ def w():
 def model():
 	d0 = Categorical([[0.3, 0.1, 0.6]])
 	d1 = ConditionalCategorical(
-		[[0.4, 0.2, 0.4],
-		 [0.1, 0.2, 0.7],
-		 [0.2, 0.5, 0.3]])
+		[[[0.4, 0.2, 0.4],
+		  [0.1, 0.2, 0.7],
+		  [0.2, 0.5, 0.3]]])
 
 	d2 = ConditionalCategorical(
-		[[[0.3, 0.1, 0.6],
+		[[[[0.3, 0.1, 0.6],
           [0.1, 0.4, 0.5],
           [0.6, 0.2, 0.2]],
 
@@ -64,7 +64,7 @@ def model():
 
          [[0.6, 0.3, 0.1],
           [0.4, 0.1, 0.5],
-          [0.6, 0.2, 0.2]]])
+          [0.6, 0.2, 0.2]]]])
 
 	return MarkovChain([d0, d1, d2])
 
@@ -143,11 +143,11 @@ def test_probability_raises(model, X):
 def test_partial_summarize(model, X):
 	model.summarize(X[:4])
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[1., 2., 1.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0], 
 		[[1., 0., 0.],
          [0., 1., 1.],
          [0., 0., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 1., 0.],
           [0., 1., 0.],
           [0., 0., 0.]],
@@ -162,11 +162,11 @@ def test_partial_summarize(model, X):
 
 	model.summarize(X[4:])
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[4., 5., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 1., 1.],
          [1., 3., 1.],
          [0., 1., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[2., 1., 0.],
           [1., 1., 0.],
           [0., 2., 0.]],
@@ -183,11 +183,11 @@ def test_partial_summarize(model, X):
 	model = MarkovChain(k=2)
 	model.summarize(X[:4])
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[1., 2., 1.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0], 
 		[[1., 0., 0.],
          [0., 1., 1.],
          [0., 0., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 1., 0.],
           [0., 1., 0.],
           [0., 0., 0.]],
@@ -203,11 +203,11 @@ def test_partial_summarize(model, X):
 
 	model.summarize(X[4:])
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[4., 5., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 1., 1.],
          [1., 3., 1.],
          [0., 1., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[2., 1., 0.],
           [1., 1., 0.],
           [0., 2., 0.]],
@@ -224,11 +224,11 @@ def test_partial_summarize(model, X):
 def test_full_summarize(model, X):
 	model.summarize(X)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[4., 5., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 1., 1.],
          [1., 3., 1.],
          [0., 1., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[2., 1., 0.],
           [1., 1., 0.],
           [0., 2., 0.]],
@@ -245,11 +245,11 @@ def test_full_summarize(model, X):
 	model = MarkovChain(k=2)
 	model.summarize(X)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[4., 5., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 1., 1.],
          [1., 3., 1.],
          [0., 1., 1.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[2., 1., 0.],
           [1., 1., 0.],
           [0., 2., 0.]],
@@ -266,11 +266,11 @@ def test_full_summarize(model, X):
 def test_summarize_weighted(model, X, w):
 	model.summarize(X, sample_weight=w)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[9., 4., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 5., 2.],
          [1., 2., 1.],
          [0., 2., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 2., 0.],
           [5., 2., 0.],
           [0., 3., 0.]],
@@ -286,11 +286,11 @@ def test_summarize_weighted(model, X, w):
 	model = MarkovChain(k=2)
 	model.summarize(X, sample_weight=w)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[9., 4., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 5., 2.],
          [1., 2., 1.],
          [0., 2., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 2., 0.],
           [5., 2., 0.],
           [0., 3., 0.]],
@@ -309,11 +309,11 @@ def test_summarize_weighted_flat(model, X, w):
 
 	model.summarize(X, sample_weight=w)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[9., 4., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 5., 2.],
          [1., 2., 1.],
          [0., 2., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 2., 0.],
           [5., 2., 0.],
           [0., 3., 0.]],
@@ -329,11 +329,11 @@ def test_summarize_weighted_flat(model, X, w):
 	model = MarkovChain(k=2)
 	model.summarize(X, sample_weight=w)
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[9., 4., 2.]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[2., 5., 2.],
          [1., 2., 1.],
          [0., 2., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 2., 0.],
           [5., 2., 0.],
           [0., 3., 0.]],
@@ -366,11 +366,11 @@ def test_from_summaries(model, X):
 	model.from_summaries()
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -385,11 +385,11 @@ def test_from_summaries(model, X):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.363636, 0.454545, 0.181818]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.5 , 0.25, 0.25],
          [0.2 , 0.6 , 0.2 ],
          [0.  , 0.5 , 0.5 ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.6667, 0.3333, 0.0000],
           [0.5000, 0.5000, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -404,11 +404,11 @@ def test_from_summaries(model, X):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-1.011601, -0.788457, -1.704748]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-0.693147, -1.386294, -1.386294],
          [-1.609438, -0.510826, -1.609438],
          [-inf, -0.693147, -0.693147]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[-0.4055, -1.0986,    -inf],
           [-0.6931, -0.6931,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -423,11 +423,11 @@ def test_from_summaries(model, X):
 
 
 	X_ = numpy.array(X)
-	d = Categorical().fit(X_[:,:1])
+	d = Categorical().fit(X_[:, 0])
 	d2 = ConditionalCategorical().fit(X_[:, :2])
 
 	assert_array_almost_equal(d.probs, model.distributions[0].probs)
-	assert_array_almost_equal(d2.probs, model.distributions[1].probs)
+	assert_array_almost_equal(d2.probs[0], model.distributions[1].probs[0])
 
 	model = MarkovChain([Categorical(), ConditionalCategorical(),
 		ConditionalCategorical()])
@@ -435,11 +435,11 @@ def test_from_summaries(model, X):
 	model.from_summaries()
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -454,11 +454,11 @@ def test_from_summaries(model, X):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.363636, 0.454545, 0.181818]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.5 , 0.25, 0.25],
          [0.2 , 0.6 , 0.2 ],
          [0.  , 0.5 , 0.5 ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.6667, 0.3333, 0.0000],
           [0.5000, 0.5000, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -473,11 +473,11 @@ def test_from_summaries(model, X):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-1.011601, -0.788457, -1.704748]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-0.693147, -1.386294, -1.386294],
          [-1.609438, -0.510826, -1.609438],
          [-inf, -0.693147, -0.693147]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[-0.4055, -1.0986,    -inf],
           [-0.6931, -0.6931,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -496,11 +496,11 @@ def test_from_summaries_weighted(model, X, w):
 	model.from_summaries()
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -515,11 +515,11 @@ def test_from_summaries_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.6     , 0.266667, 0.133333]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.222222, 0.555556, 0.222222],
          [0.25    , 0.5     , 0.25    ], 
          [0.      , 1.      , 0.      ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.0000, 1.0000, 0.0000],
           [0.7143, 0.2857, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -534,11 +534,11 @@ def test_from_summaries_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-0.510826, -1.321756, -2.014903]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-1.504077, -0.587787, -1.504077],
          [-1.386294, -0.693147, -1.386294],
          [     -inf,  0.      ,      -inf]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[   -inf,  0.0000,    -inf],
           [-0.3365, -1.2528,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -553,11 +553,11 @@ def test_from_summaries_weighted(model, X, w):
 
 
 	X_ = numpy.array(X)
-	d = Categorical().fit(X_[:,:1], sample_weight=w)
+	d = Categorical().fit(X_[:, 0], sample_weight=w)
 	d2 = ConditionalCategorical().fit(X_[:, :2], sample_weight=w)
 
 	assert_array_almost_equal(d.probs, model.distributions[0].probs)
-	assert_array_almost_equal(d2.probs, model.distributions[1].probs)
+	assert_array_almost_equal(d2.probs[0], model.distributions[1].probs[0])
 
 
 	model = MarkovChain([Categorical(), ConditionalCategorical(),
@@ -566,11 +566,11 @@ def test_from_summaries_weighted(model, X, w):
 	model.from_summaries()
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -585,11 +585,11 @@ def test_from_summaries_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.6     , 0.266667, 0.133333]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.222222, 0.555556, 0.222222],
          [0.25    , 0.5     , 0.25    ], 
          [0.      , 1.      , 0.      ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.0000, 1.0000, 0.0000],
           [0.7143, 0.2857, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -604,11 +604,11 @@ def test_from_summaries_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-0.510826, -1.321756, -2.014903]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-1.504077, -0.587787, -1.504077],
          [-1.386294, -0.693147, -1.386294],
          [     -inf,  0.      ,      -inf]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[   -inf,  0.0000,    -inf],
           [-0.3365, -1.2528,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -625,21 +625,21 @@ def test_from_summaries_weighted(model, X, w):
 def test_from_summaries_frozen(model, X):
 	p0 = [[0.3, 0.1, 0.6]]
 
-	p1 = [[0.4, 0.2, 0.4],
-		  [0.1, 0.2, 0.7],
-		  [0.2, 0.5, 0.3]]
+	p1 = [[[0.4, 0.2, 0.4],
+		   [0.1, 0.2, 0.7],
+		   [0.2, 0.5, 0.3]]]
 
-	p2 = [[[0.3, 0.1, 0.6],
-           [0.1, 0.4, 0.5],
-           [0.6, 0.2, 0.2]],
+	p2 = [[[[0.3, 0.1, 0.6],
+            [0.1, 0.4, 0.5],
+            [0.6, 0.2, 0.2]],
 
-          [[0.2, 0.3, 0.5],
-           [0.7, 0.1, 0.2],
-           [0.8, 0.1, 0.1]],
+           [[0.2, 0.3, 0.5],
+            [0.7, 0.1, 0.2],
+            [0.8, 0.1, 0.1]],
 
-          [[0.6, 0.3, 0.1],
-           [0.4, 0.1, 0.5],
-           [0.6, 0.2, 0.2]]]
+           [[0.6, 0.3, 0.1],
+            [0.4, 0.1, 0.5],
+            [0.6, 0.2, 0.2]]]]
 
 	d0 = Categorical(p0)
 	d1 = ConditionalCategorical(p1)
@@ -650,8 +650,8 @@ def test_from_summaries_frozen(model, X):
 	model.from_summaries()
 
 	assert_array_almost_equal(model.distributions[0].probs, p0)
-	assert_array_almost_equal(model.distributions[1].probs, p1)
-	assert_array_almost_equal(model.distributions[2].probs, p2)
+	assert_array_almost_equal(model.distributions[1].probs[0], p1[0])
+	assert_array_almost_equal(model.distributions[2].probs[0], p2[0])
 
 	d2 = ConditionalCategorical(p2, frozen=True)
 
@@ -662,8 +662,8 @@ def test_from_summaries_frozen(model, X):
 	assert_raises(AssertionError, assert_array_almost_equal, 
 		model.distributions[0].probs, p0)
 	assert_raises(AssertionError, assert_array_almost_equal, 
-		model.distributions[1].probs, p1)
-	assert_array_almost_equal(model.distributions[2].probs, p2)
+		model.distributions[1].probs[0], p1[0])
+	assert_array_almost_equal(model.distributions[2].probs[0], p2[0])
 
 	d0 = Categorical(p0, frozen=True)
 	d2 = ConditionalCategorical(p2)
@@ -674,20 +674,20 @@ def test_from_summaries_frozen(model, X):
 
 	assert_array_almost_equal(model.distributions[0].probs, p0)
 	assert_raises(AssertionError, assert_array_almost_equal, 
-		model.distributions[1].probs, p1)
+		model.distributions[1].probs[0], p1[0])
 	assert_raises(AssertionError, assert_array_almost_equal,
-		model.distributions[2].probs, p2)
+		model.distributions[2].probs[0], p2[0])
 
 
 def test_fit(model, X):
 	model.fit(X)
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -702,11 +702,11 @@ def test_fit(model, X):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.363636, 0.454545, 0.181818]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.5 , 0.25, 0.25],
          [0.2 , 0.6 , 0.2 ],
          [0.  , 0.5 , 0.5 ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.6667, 0.3333, 0.0000],
           [0.5000, 0.5000, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -721,11 +721,11 @@ def test_fit(model, X):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-1.011601, -0.788457, -1.704748]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-0.693147, -1.386294, -1.386294],
          [-1.609438, -0.510826, -1.609438],
          [-inf, -0.693147, -0.693147]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[-0.4055, -1.0986,    -inf],
           [-0.6931, -0.6931,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -740,22 +740,22 @@ def test_fit(model, X):
 
 
 	X_ = numpy.array(X)
-	d = Categorical().fit(X_[:,:1])
+	d = Categorical().fit(X_[:, 0])
 	d2 = ConditionalCategorical().fit(X_[:, :2])
 
 	assert_array_almost_equal(d.probs, model.distributions[0].probs)
-	assert_array_almost_equal(d2.probs, model.distributions[1].probs)
+	assert_array_almost_equal(d2.probs[0], model.distributions[1].probs[0])
 
 	model = MarkovChain([Categorical(), ConditionalCategorical(),
 		ConditionalCategorical()])
 	model.fit(X)
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -770,11 +770,11 @@ def test_fit(model, X):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.363636, 0.454545, 0.181818]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.5 , 0.25, 0.25],
          [0.2 , 0.6 , 0.2 ],
          [0.  , 0.5 , 0.5 ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.6667, 0.3333, 0.0000],
           [0.5000, 0.5000, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -789,11 +789,11 @@ def test_fit(model, X):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-1.011601, -0.788457, -1.704748]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-0.693147, -1.386294, -1.386294],
          [-1.609438, -0.510826, -1.609438],
          [-inf, -0.693147, -0.693147]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[-0.4055, -1.0986,    -inf],
           [-0.6931, -0.6931,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -811,11 +811,11 @@ def test_fit_weighted(model, X, w):
 	model.fit(X, sample_weight=w)
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -830,11 +830,11 @@ def test_fit_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.6     , 0.266667, 0.133333]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.222222, 0.555556, 0.222222],
          [0.25    , 0.5     , 0.25    ], 
          [0.      , 1.      , 0.      ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.0000, 1.0000, 0.0000],
           [0.7143, 0.2857, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -849,11 +849,11 @@ def test_fit_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-0.510826, -1.321756, -2.014903]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-1.504077, -0.587787, -1.504077],
          [-1.386294, -0.693147, -1.386294],
          [     -inf,  0.      ,      -inf]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[   -inf,  0.0000,    -inf],
           [-0.3365, -1.2528,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -868,11 +868,11 @@ def test_fit_weighted(model, X, w):
 
 
 	X_ = numpy.array(X)
-	d = Categorical().fit(X_[:,:1], sample_weight=w)
+	d = Categorical().fit(X_[:, 0], sample_weight=w)
 	d2 = ConditionalCategorical().fit(X_[:, :2], sample_weight=w)
 
 	assert_array_almost_equal(d.probs, model.distributions[0].probs)
-	assert_array_almost_equal(d2.probs, model.distributions[1].probs)
+	assert_array_almost_equal(d2.probs[0], model.distributions[1].probs[0])
 
 
 	model = MarkovChain([Categorical(), ConditionalCategorical(),
@@ -880,11 +880,11 @@ def test_fit_weighted(model, X, w):
 	model.fit(X, sample_weight=w)
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -899,11 +899,11 @@ def test_fit_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.6     , 0.266667, 0.133333]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.222222, 0.555556, 0.222222],
          [0.25    , 0.5     , 0.25    ], 
          [0.      , 1.      , 0.      ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.0000, 1.0000, 0.0000],
           [0.7143, 0.2857, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -918,11 +918,11 @@ def test_fit_weighted(model, X, w):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-0.510826, -1.321756, -2.014903]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-1.504077, -0.587787, -1.504077],
          [-1.386294, -0.693147, -1.386294],
          [     -inf,  0.      ,      -inf]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[   -inf,  0.0000,    -inf],
           [-0.3365, -1.2528,    -inf],
           [   -inf,  0.0000,    -inf]],
@@ -939,31 +939,31 @@ def test_fit_weighted(model, X, w):
 def test_fit_chain(X):
 	d0 = Categorical([[0.3, 0.1, 0.6]])
 	d1 = ConditionalCategorical(
-		[[0.4, 0.2, 0.4],
-		 [0.1, 0.2, 0.7],
-		 [0.2, 0.5, 0.3]])
+		[[[0.4, 0.2, 0.4],
+		  [0.1, 0.2, 0.7],
+		  [0.2, 0.5, 0.3]]])
 
 	d2 = ConditionalCategorical(
-		[[[0.3, 0.1, 0.6],
-          [0.1, 0.4, 0.5],
-          [0.6, 0.2, 0.2]],
+		[[[[0.3, 0.1, 0.6],
+           [0.1, 0.4, 0.5],
+           [0.6, 0.2, 0.2]],
 
-         [[0.2, 0.3, 0.5],
-          [0.7, 0.1, 0.2],
-          [0.8, 0.1, 0.1]],
+          [[0.2, 0.3, 0.5],
+           [0.7, 0.1, 0.2],
+           [0.8, 0.1, 0.1]],
 
-         [[0.6, 0.3, 0.1],
-          [0.4, 0.1, 0.5],
-          [0.6, 0.2, 0.2]]])
+          [[0.6, 0.3, 0.1],
+           [0.4, 0.1, 0.5],
+           [0.6, 0.2, 0.2]]]])
 
 	model = MarkovChain([d0, d1, d2]).fit(X)
 
 	assert_array_almost_equal(model.distributions[0]._xw_sum, [[0., 0., 0]])
-	assert_array_almost_equal(model.distributions[1]._xw_sum,
+	assert_array_almost_equal(model.distributions[1]._xw_sum[0],
 		[[0., 0., 0.],
          [0., 0., 0.],
          [0., 0., 0.]])
-	assert_array_almost_equal(model.distributions[2]._xw_sum,
+	assert_array_almost_equal(model.distributions[2]._xw_sum[0],
 		[[[0., 0., 0.],
           [0., 0., 0.],
           [0., 0., 0.]],
@@ -978,11 +978,11 @@ def test_fit_chain(X):
 
 	assert_array_almost_equal(model.distributions[0].probs, 
 		[[0.363636, 0.454545, 0.181818]])
-	assert_array_almost_equal(model.distributions[1].probs,
+	assert_array_almost_equal(model.distributions[1].probs[0],
 		[[0.5 , 0.25, 0.25],
          [0.2 , 0.6 , 0.2 ],
          [0.  , 0.5 , 0.5 ]])
-	assert_array_almost_equal(model.distributions[2].probs,
+	assert_array_almost_equal(model.distributions[2].probs[0],
 		[[[0.6667, 0.3333, 0.0000],
           [0.5000, 0.5000, 0.0000],
           [0.0000, 1.0000, 0.0000]],
@@ -997,11 +997,11 @@ def test_fit_chain(X):
 
 	assert_array_almost_equal(model.distributions[0]._log_probs,
 		[[-1.011601, -0.788457, -1.704748]])
-	assert_array_almost_equal(model.distributions[1]._log_probs,
+	assert_array_almost_equal(model.distributions[1]._log_probs[0],
 		[[-0.693147, -1.386294, -1.386294],
          [-1.609438, -0.510826, -1.609438],
          [-inf, -0.693147, -0.693147]])
-	assert_array_almost_equal(model.distributions[2]._log_probs,
+	assert_array_almost_equal(model.distributions[2]._log_probs[0],
 		[[[-0.4055, -1.0986,    -inf],
           [-0.6931, -0.6931,    -inf],
           [   -inf,  0.0000,    -inf]],

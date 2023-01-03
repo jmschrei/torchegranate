@@ -51,7 +51,7 @@ class Categorical(Distribution):
 		parameter directly. Default is False.
 	"""
 
-	def __init__(self, probs=None, inertia=0.0, frozen=False):
+	def __init__(self, probs=None, n_categories=None, inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Categorical"
 
@@ -60,7 +60,12 @@ class Categorical(Distribution):
 
 		self._initialized = probs is not None
 		self.d = self.probs.shape[-2] if self._initialized else None
-		self.n_keys = self.probs.shape[-1] if self._initialized else None
+
+		if n_categories is not None:
+			self.n_keys = n_categories
+		else:
+			self.n_keys = self.probs.shape[-1] if self._initialized else None
+		
 		self._reset_cache()
 
 	def _initialize(self, d, n_keys):
@@ -141,37 +146,6 @@ class Categorical(Distribution):
 
 		return logps
 
-	def _summarize(self, X, sample_weight):
-		"""Extract the sufficient statistics from a batch of data.
-
-		This method calculates the sufficient statistics from optionally
-		weighted data and adds them to the stored cache. The examples must be
-		given in a 2D format. Sample weights can either be provided as one
-		value per example or as a 2D matrix of weights for each feature in
-		each example.
-
-
-		Parameters
-		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
-			A set of examples to summarize.
-
-		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
-			A set of weights for the examples. This can be either of shape
-			(-1, self.d) or a vector of shape (-1,). Default is ones.
-		"""
-
-		X = _cast_as_tensor(X)
-		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight))
-		
-		if not self._initialized:
-			self._initialize(len(X[0]), int(X.max())+1)
-
-		_check_parameter(sample_weight, "sample_weight", min_value=0, 
-			shape=(-1, self.d))
-
-		return X, sample_weight
-
 	def summarize(self, X, sample_weight=None):
 		"""Extract the sufficient statistics from a batch of data.
 
@@ -197,7 +171,8 @@ class Categorical(Distribution):
 
 		X = _cast_as_tensor(X)
 		if not self._initialized:
-			self._initialize(X.shape[1], int(X.max())+1)
+			n_keys = self.n_keys if self.n_keys is not None else int(X.max())+1
+			self._initialize(X.shape[1], n_keys)
 
 		X = _check_parameter(X, "X", min_value=0, max_value=self.n_keys-1, 
 			ndim=2, shape=(-1, self.d))

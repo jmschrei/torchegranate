@@ -23,6 +23,8 @@ class MarkovChain(Distribution):
 			dtypes=(list, tuple))
 		self.k = _check_parameter(_cast_as_tensor(k, dtype=torch.int32), "k",
 			ndim=0)
+		self.n_categories = _check_parameter(n_categories, "n_categories",
+			dtypes=(list, tuple))
 
 		if distributions is None and k is None:
 			raise ValueError("Must provide one of 'distributions', or 'k'.")
@@ -30,14 +32,17 @@ class MarkovChain(Distribution):
 		if distributions is not None:
 			self.k = len(distributions) - 1
 		
+		if n_categories is None:
+			self.n_categories = [None for i in range(self.k+1)]
+
 		self.d = None
 		self._initialized = distributions is not None and distributions[0]._initialized
 		self._reset_cache()
 
 	def _initialize(self, d):
-		self.distributions = [Categorical()]
+		self.distributions = [Categorical(n_categories=self.n_categories[0])]
 		for i in range(self.k):
-			self.distributions.append(ConditionalCategorical())
+			self.distributions.append(ConditionalCategorical(n_categories=self.n_categories[i+1]))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -46,10 +51,10 @@ class MarkovChain(Distribution):
 		return
 
 	def log_probability(self, X):
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
 		self.d = X.shape[1]
 
-		logps = self.distributions[0].log_probability(X[:, :1])
+		logps = self.distributions[0].log_probability(X[:, 0])
 		for i, distribution in enumerate(self.distributions[1:-1]):
 			logps += distribution.log_probability(X[:, :i+2])
 
@@ -71,16 +76,23 @@ class MarkovChain(Distribution):
 		if not self._initialized:
 			self._initialize(len(X[0]))
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
-		self.d = X.shape[1]
-		
-		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32))[:,0]
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
+		sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
+			"sample_weight", min_value=0, ndim=(1, 2))
 
-		_check_parameter(sample_weight, "sample_weight", min_value=0)
+		if sample_weight is None:
+			sample_weight = torch.ones_like(X[:, 0])
+		elif len(sample_weight.shape) == 1: 
+			sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[2])
+		elif sample_weight.shape[1] == 1:
+			sample_weight = sample_weight.expand(-1, X.shape[2])
 
-		for i, distribution in enumerate(self.distributions[:-1]):
-			distribution.summarize(X[:, :i+1], sample_weight=sample_weight)
+		_check_parameter(_cast_as_tensor(sample_weight), "sample_weight", 
+			min_value=0, ndim=2, shape=(X.shape[0], X.shape[2]))
+
+		self.distributions[0].summarize(X[:, 0], sample_weight=sample_weight)
+		for i, distribution in enumerate(self.distributions[1:-1]):
+			distribution.summarize(X[:, :i+2], sample_weight=sample_weight)
 
 		distribution = self.distributions[-1]
 		for i in range(X.shape[1] - self.k):
