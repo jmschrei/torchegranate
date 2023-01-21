@@ -123,3 +123,6 @@ Currently, implementations of many distributions are included, as well as genera
 > How much faster is this than pomegranate?
 
 It depends on the method being used. Most individual distributions are approximately 2-3x faster. Some distributions, such as the categorical distributions, can be over 10x faster. These will be even faster if a GPU is used.
+
+## License
+The contents of this repository is under an [MIT License](https://github.com/jmschrei/torchegranate/blob/main/LICENSE).
