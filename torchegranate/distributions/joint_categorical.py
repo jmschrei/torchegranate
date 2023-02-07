@@ -4,6 +4,7 @@
 import torch
 
 from .._utils import _cast_as_tensor
+from .._utils import _cast_as_parameter
 from .._utils import _update_parameter
 from .._utils import _check_parameter
 from .._utils import _reshape_weights
@@ -19,7 +20,7 @@ class JointCategorical(Distribution):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "JointCategorical"
 
-		self.probs = _check_parameter(_cast_as_tensor(probs), "probs", 
+		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
 			min_value=0, max_value=1, value_sum=1)
 
 		self.n_categories = _check_parameter(n_categories, "n_categories", min_value=2)
@@ -41,7 +42,7 @@ class JointCategorical(Distribution):
 		self._reset_cache()
 
 	def _initialize(self, d, n_categories):
-		self.probs = torch.zeros(*n_categories)
+		self.probs = _cast_as_parameter(torch.zeros(*n_categories))
 
 		self.n_categories = n_categories
 		self._initialized = True

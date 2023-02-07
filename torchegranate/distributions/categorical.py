@@ -104,7 +104,6 @@ class Categorical(Distribution):
 		if self._initialized == False:
 			return
 
-
 		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
 		self.register_buffer("_xw_sum", torch.zeros(self.d, self.n_keys, 
 			device=self.device))

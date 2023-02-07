@@ -89,7 +89,7 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 
 def _check_parameter(parameter, name, min_value=None, max_value=None, 
 	value_sum=None, value_set=None, dtypes=None, ndim=None, shape=None,
-	epsilon=1e-6):
+	check_parameter=True, epsilon=1e-6):
 	"""Ensures that the parameter falls within a valid range.
 
 	This check accepts several optional conditions that can be used to ensure
@@ -144,6 +144,9 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 
 	if parameter is None:
 		return None
+
+	if check_parameter == False:
+		return parameter
 
 	if dtypes is not None:
 		if isinstance(parameter, vector):

@@ -18,6 +18,10 @@ class GraphMixin(torch.nn.Module):
 	def add_nodes(self, nodes):
 		self.nodes.extend(nodes)
 
-	def add_edge(self, start, end, probability):
-		self.edges.append((start, end, probability))
+	def add_edge(self, start, end, probability=None):
+		if probability is None:
+			edge = start, end
+		else:
+			edge = start, end, probability
 
+		self.edges.append(edge)

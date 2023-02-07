@@ -75,3 +75,11 @@ class Distribution(torch.nn.Module):
 
 	def from_summaries(self):
 		raise NotImplementedError
+
+
+class ConditionalDistribution(Distribution):
+	def __init__(self, inertia, frozen):
+		super().__init__(inertia=inertia, frozen=frozen)
+
+	def marginal(self, dim):
+		raise NotImplementedError

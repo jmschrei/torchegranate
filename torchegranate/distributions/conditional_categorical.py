@@ -13,13 +13,14 @@ from .._utils import _reshape_weights
 
 from .._utils import BufferList
 
-from ._distribution import Distribution
+from ._distribution import ConditionalDistribution
 from .categorical import Categorical
 
-class ConditionalCategorical(Distribution):
+class ConditionalCategorical(ConditionalDistribution):
 	"""Still under development."""
 	
-	def __init__(self, probs=None, n_categories=None, pseudocount=0, inertia=0.0, frozen=False):
+	def __init__(self, probs=None, n_categories=None, pseudocount=0, 
+		check_inputs=True, inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "ConditionalCategorical"
 
@@ -39,6 +40,7 @@ class ConditionalCategorical(Distribution):
 			self.n_categories = n_categories
 		
 		self.pseudocount = _check_parameter(pseudocount, "pseudocount")
+		self.check_inputs = check_inputs
 
 		self._initialized = probs is not None
 		self.d = len(self.probs) if self._initialized else None
@@ -102,26 +104,27 @@ class ConditionalCategorical(Distribution):
 		if not self._initialized:
 			self._initialize(len(X[0][0]), torch.max(X, dim=0)[0].T+1)
 
-		X = _check_parameter(X, "X", shape=(-1, self.n_parents, self.d))
-		sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
-			"sample_weight", min_value=0, ndim=(1, 2))
+		X = _check_parameter(X, "X", shape=(-1, self.n_parents, self.d),
+			check_parameter=self.check_inputs)
+		sample_weight = _check_parameter(_cast_as_tensor(sample_weight, 
+			dtype=torch.float32), "sample_weight", min_value=0, ndim=(1, 2))
 
 		if sample_weight is None:
-			sample_weight = torch.ones_like(X[:, 0])
+			sample_weight = torch.ones(X[:, 0].shape[0], X[:, 0].shape[-1], dtype=self.probs[0].dtype)
 		elif len(sample_weight.shape) == 1: 
 			sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[2])
 		elif sample_weight.shape[1] == 1 and self.d > 1:
 			sample_weight = sample_weight.expand(-1, X.shape[2])
 
-		_check_parameter(_cast_as_tensor(sample_weight), "sample_weight", 
+		_check_parameter(sample_weight, "sample_weight", 
 			min_value=0, ndim=2, shape=(X.shape[0], X.shape[2]))
 
-		for i in range(len(X)):
-			for j in range(self.d):
-				X_ = tuple(X[i, :, j])
+		for j in range(self.d):
+			strides = torch.tensor(self._xw_sum[j].stride(), device=X.device)
+			X_ = torch.sum(X[:, :, j] * strides, dim=-1)
 
-				self._w_sum[j][X_[:-1]] += sample_weight[i, j]
-				self._xw_sum[j][X_] += sample_weight[i, j]
+			self._xw_sum[j].view(-1).scatter_add_(0, X_, sample_weight[:,j])
+			self._w_sum[j][:] = self._xw_sum[j].sum(dim=-1)
 
 	def from_summaries(self):
 		if self.frozen == True:
