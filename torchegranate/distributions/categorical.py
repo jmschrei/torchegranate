@@ -51,12 +51,16 @@ class Categorical(Distribution):
 		parameter directly. Default is False.
 	"""
 
-	def __init__(self, probs=None, n_categories=None, inertia=0.0, frozen=False):
+	def __init__(self, probs=None, n_categories=None, pseudocount=0.0, 
+		inertia=0.0, frozen=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "Categorical"
 
 		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
 			min_value=0, max_value=1, ndim=2)
+
+
+		self.pseudocount = pseudocount
 
 		self._initialized = probs is not None
 		self.d = self.probs.shape[-2] if self._initialized else None
@@ -195,7 +199,8 @@ class Categorical(Distribution):
 		if self.frozen == True:
 			return
 
-		probs = self._xw_sum / self._w_sum.unsqueeze(1)
+		probs = (self._xw_sum + self.pseudocount) / (self._w_sum + 
+			self.pseudocount * self.n_keys).unsqueeze(1)
 
 		_update_parameter(self.probs, probs, self.inertia)
 		self._reset_cache()

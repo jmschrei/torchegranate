@@ -297,9 +297,8 @@ class BayesianNetwork(Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
 		
 		logps = torch.zeros(X.shape[0], device=X.device, dtype=torch.float32)
-		for i in range(self.d):
-			distribution = self.distributions[i]
-			parents = tuple(self._parents[i] + [i,])
+		for i, distribution in enumerate(self.distributions):
+			parents = self._parents[i] + (i,)
 
 			X_ = X[:, parents]
 			if len(parents) > 1:
@@ -309,10 +308,50 @@ class BayesianNetwork(Distribution):
 
 		return logps
 
-	def predict_proba(self, X):
-		"""Predict the missing values in a data set given the model.
+	def predict(self, X):
+		"""Infers the maximum likelihood value for each missing value.
 
-		This method predicts a probability distribution for each of the missing 
+		This method infers a probability distribution for each of the missing
+		values in the data. It uses the factor graph representation of the
+		Bayesian network to run the sum-product/loopy belief propogation
+		algorithm. After the probability distribution is inferred, the maximum
+		likeihood value for each variable is returned.
+
+		The input to this method must be a torch.masked.MaskedTensor where the
+		mask specifies which variables are observed (mask = True) and which ones
+		are not observed (mask = False) for each of the values. When setting
+		mask = False, it does not matter what the corresponding value in the
+		tensor is. Different sets of variables can be observed or missing in
+		different examples. 
+
+		Unlike the `predict_proba` and `predict_log_proba` methods, this
+		method preserves the dimensions of the original data because it does
+		not matter how many categories a variable can take when you're only
+		returning the maximally likely one.
+
+
+		Parameters
+		----------
+		X: torch.masked.MaskedTensor, shape=(-1, d)
+			The data to predict values for. The mask should correspond to
+			whether the variable is observed in the example. 
+		
+
+		Returns
+		-------
+		y: torch.tensor, shape=(-1, d)
+			A completed version of the incomplete input tensor. The missing
+			variables are replaced with the maximally likely values from
+			the sum-product algorithm, and observed variables are kept.
+		"""
+
+		y = [t.argmax(dim=1) for t in self.predict_proba(X)]
+		return torch.vstack(y).T.contiguous()
+
+	def predict_proba(self, X):
+		"""Infers the probability of each category given the model and data.
+
+		This method infers a probability distribution for each of the missing 
 		values in the data. It uses the factor graph representation of the
 		Bayesian network to run the sum-product/loopy belief propogation
 		algorithm.
@@ -354,6 +393,55 @@ class BayesianNetwork(Distribution):
 
 		return self._factor_graph.predict_proba(X)
 
+	def predict_log_proba(self, X):
+		"""Infers the probability of each category given the model and data.
+
+		This method is a wrapper around the `predict_proba` method and simply
+		takes the log of each returned tensor.
+
+		This method infers a log probability distribution for each of the 
+		missing  values in the data. It uses the factor graph representation of 
+		the Bayesian network to run the sum-product/loopy belief propogation
+		algorithm.
+
+		The input to this method must be a torch.masked.MaskedTensor where the
+		mask specifies which variables are observed (mask = True) and which ones
+		are not observed (mask = False) for each of the values. When setting
+		mask = False, it does not matter what the corresponding value in the
+		tensor is. Different sets of variables can be observed or missing in
+		different examples. 
+
+		An important note is that, because each variable can have a different
+		number of categories in the categorical setting, the return is a list
+		of tensors where each element in that list is the marginal probability
+		distribution for that variable. More concretely: the first element will
+		be the distribution of values for the first variable across all
+		examples. When the first variable has been provided as evidence, the
+		distribution will be clamped to the value provided as evidence.
+
+		..warning:: This inference is exact given a Bayesian network that has
+		a tree-like structure, but is only approximate for other cases. When
+		the network is acyclic, this procedure will converge, but if the graph
+		contains cycles then there is no guarantee on convergence.
+
+
+		Parameters
+		----------
+		X: torch.masked.MaskedTensor, shape=(-1, d)
+			The data to predict values for. The mask should correspond to
+			whether the variable is observed in the example. 
+		
+
+		Returns
+		-------
+		y: list of tensors, shape=(d,)
+			A list of tensors where each tensor contains the distribution of
+			values for that dimension.
+		"""
+
+		return [torch.log(t) for t in self.predict_proba(X)]
+
+
 
 	def fit(self, X, sample_weight=None):
 		"""Fit the model to optionally weighted examples.
@@ -382,9 +470,15 @@ class BayesianNetwork(Distribution):
 		"""
 
 		if self.structure is not None:
-			return _from_structure(X, sample_weight, self.structure)
+			distributions = _from_structure(X, sample_weight, self.structure)
+			self.add_distributions(distributions)
 
-		if self.algorithm is not None:
+			for i, parents in enumerate(self.structure):
+				if len(parents) > 0:
+					for parent in parents:
+						self.add_edge(distributions[parent], distributions[i])
+
+		elif self.algorithm is not None:
 			return _learn_structure(X, sample_weight, algorithm=self.algorithm, 
 				include_parents=self.include_parents, 
 				exclude_parents=self.exclude_parents, 
@@ -403,22 +497,16 @@ class BayesianNetwork(Distribution):
 		if not self._initialized:
 			self._initialize(len(X[0]))
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
-		sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
-			"sample_weight", min_value=0, ndim=(1, 2))
+		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
+		X = _check_parameter(X, "X", min_value=0, ndim=2)
 
-		if sample_weight is None:
-			sample_weight = torch.ones_like(X[:, 0])
-		elif len(sample_weight.shape) == 1: 
-			sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[2])
-		elif sample_weight.shape[1] == 1:
-			sample_weight = sample_weight.expand(-1, X.shape[2])
+		for i, distribution in enumerate(self.distributions):
+			parents = self._parents[i] + (i,)
 
-		_check_parameter(_cast_as_tensor(sample_weight), "sample_weight", 
-			min_value=0, ndim=2, shape=(X.shape[0], X.shape[2]))
-
-		for distribution, parents in zip(self.distributions, self.parents):
-			distribution.summarize(X[:, parents].unsqueeze(1))
+			if len(parents) == 1:
+				distribution.summarize(X[:, parents])
+			else:
+				distribution.summarize(X[:, parents].unsqueeze(-1))
 
 	def from_summaries(self):
 		if self.frozen:
@@ -431,12 +519,11 @@ class BayesianNetwork(Distribution):
 
 #####
 
-def _from_structure(X, sample_weight=None, structure=None):
-	"""Fits a Bayesian network to data given the structure.
+def _from_structure(X, sample_weight=None, structure=None, pseudocount=0.0):
+	"""Fits a set of distributions to data given the structure.
 
-	Given the structure passed in at the initialization of the Bayesian
-	network, create the distribution objects and fit their parameters to
-	the given data. This does not perform structure learning.
+	Given the structure, create the distribution objects and fit their 
+	parameters to the given data. This does not perform structure learning.
 
 
 	Parameters
@@ -448,7 +535,13 @@ def _from_structure(X, sample_weight=None, structure=None):
 		A set of weights for the examples. This can be either of shape
 		(-1, self.d) or a vector of shape (-1,). Default is ones.
 
-	structure: list or tuple
+	structure: tuple
+		A tuple of tuples where the internal tuples indicate the parents of
+		that variable. 
+
+	pseudocount: double
+		A pseudocount to add to each count. Default is 0.
+
 
 	Returns
 	-------
@@ -493,13 +586,7 @@ def _from_structure(X, sample_weight=None, structure=None):
 
 		distributions.append(d)
 
-	model.add_distributions(distributions)
-	for i, parents in enumerate(structure):
-		if len(parents) > 0:
-			for parent in parents:
-				model.add_edge(distributions[parent], distributions[i])
-
-	return model
+	return distributions
 
 
 def _learn_structure(X, sample_weight=None, algorithm='chow-liu', 
@@ -622,7 +709,7 @@ def _categorical_chow_liu(X, sample_weight=None, pseudocount=0.0, root=0):
 	Returns
 	-------
 	structure: tuple
-		A tuple of tuples where the internal tuples indicate the parent of
+		A tuple of tuples where the internal tuples indicate the parents of
 		that variable. 
 	"""
 

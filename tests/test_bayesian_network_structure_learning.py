@@ -267,7 +267,7 @@ def test_categorical_learn_structure_exact():
 ###
 
 
-def test_from_structure(X):
+def test_categorical_from_structure(X):
 	structure = ((), (0,), (1, 3), ())
 	
 	model = _from_structure(X, structure=structure)
@@ -278,11 +278,46 @@ def test_from_structure(X):
 	assert isinstance(model.distributions[3], Categorical)
 
 	p0 = model.distributions[0].probs
-	p1 = model.distributions[1].probs
-	p2 = model.distributions[2].probs
+	p1 = model.distributions[1].probs[0]
+	p2 = model.distributions[2].probs[0]
 	p3 = model.distributions[3].probs
 
 	assert_array_almost_equal(p0, [[0.454545, 0.545455]])
-	assert_array_almost_equal(p1, [0])
-	assert_array_almost_equal(p2, [0])
-	assert_array_almost_equal(p3, [0])
+	assert_array_almost_equal(p1, [[0.4     , 0.4     , 0.2     ], [0.166667, 0.5     , 0.333333]])
+	assert_array_almost_equal(p2, [[[0.0000, 1.0000],
+         [0.5000, 0.5000]],
+
+        [[0.5000, 0.5000],
+         [1.0000, 0.0000]],
+
+        [[0.5000, 0.5000],
+         [0.0000, 1.0000]]])
+	assert_array_almost_equal(p3, [[0.4545, 0.5455]], 4)
+
+
+def test_categorical_from_structure_weighted(X, w):
+	structure = ((), (0,), (1, 3), ())
+	
+	model = _from_structure(X, sample_weight=w, structure=structure)
+
+	assert isinstance(model.distributions[0], Categorical)
+	assert isinstance(model.distributions[1], ConditionalCategorical)
+	assert isinstance(model.distributions[2], ConditionalCategorical)
+	assert isinstance(model.distributions[3], Categorical)
+
+	p0 = model.distributions[0].probs
+	p1 = model.distributions[1].probs[0]
+	p2 = model.distributions[2].probs[0]
+	p3 = model.distributions[3].probs
+
+	assert_array_almost_equal(p0, [[0.6719, 0.3281]], 4)
+	assert_array_almost_equal(p1, [[0.2674, 0.6047, 0.1279], [0.2381, 0.5238, 0.2381]], 4)
+	assert_array_almost_equal(p2, [[[0.0000, 1.0000],
+         [0.6667, 0.3333]],
+
+        [[0.7561, 0.2439],
+         [1.0000, 0.0000]],
+
+        [[0.4762, 0.5238],
+         [0.5000, 0.5000]]], 4)
+	assert_array_almost_equal(p3, [[0.5078, 0.4922]], 4)
