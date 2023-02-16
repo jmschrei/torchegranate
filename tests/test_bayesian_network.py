@@ -684,8 +684,7 @@ def test_predict_log_proba_diamond(X_masked, distributions):
 def test_predict_cycle(X, X_masked, distributions):
 	model = BayesianNetwork(structure=((1,), (2,), (3,), (0,))).fit(X)
 	y_hat = model.predict(X_masked)
-	print(y_hat)
-
+	
 	assert_array_equal(y_hat,
 		[[1, 2, 0, 0],
          [0, 0, 1, 0],
