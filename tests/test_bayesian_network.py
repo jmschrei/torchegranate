@@ -12,6 +12,7 @@ from torchegranate.distributions import ConditionalCategorical
 
 
 from nose.tools import assert_raises
+from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
 
 
@@ -28,6 +29,11 @@ def X():
 	     [1, 1, 0, 1],
 	     [0, 2, 1, 0],
 	     [0, 0, 0, 1]]
+
+
+@pytest.fixture
+def w():
+	return [0, 1.3, 0, 1.2, 2.5, 6.1, 0, 0, 2.1, 0.3, 3.3]
 
 
 @pytest.fixture
@@ -249,6 +255,18 @@ def test_log_probability(X, distributions):
 	assert_array_almost_equal(logps, [-7.013116, -2.700082, -5.115996, 
 		-7.264431, -5.184989, -4.491842, -4.422849, -3.709082, -5.184989, 
 		-3.393229, -2.140466])
+
+
+def test_probability(X, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+
+	model = BayesianNetwork([d1, d22, d13, d4], [(d1, d22), (d22, d13), 
+		(d4, d13)])
+	ps = model.probability(X)
+
+	assert_array_almost_equal(ps, numpy.exp([-7.013116, -2.700082, -5.115996, 
+		-7.264431, -5.184989, -4.491842, -4.422849, -3.709082, -5.184989, 
+		-3.393229, -2.140466]), 4)
 
 
 def test_predict_proba_one_node():
@@ -486,7 +504,7 @@ def test_predict_proba_simple(X_masked, distributions):
          [0.3565, 0.6435]], 4)
 
 
-def test_predict_proba_cycle(X_masked, distributions):
+def test_predict_proba_diamond(X_masked, distributions):
 	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
 
 	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
@@ -544,3 +562,518 @@ def test_predict_proba_cycle(X_masked, distributions):
          [0.3488, 0.6512],
          [1.0000, 0.0000],
          [0.6818, 0.3182]], 4)
+
+
+def test_predict_proba_cycle(X, X_masked, distributions):
+	model = BayesianNetwork(structure=((1,), (2,), (3,), (0,))).fit(X)
+	y_hat = model.predict_proba(X_masked)
+
+	assert_array_almost_equal(y_hat[0], 
+		[[0.4737, 0.5263],
+         [1.0000, 0.0000],
+         [0.6065, 0.3935],
+         [0.0000, 1.0000],
+         [0.3825, 0.6175],
+         [1.0000, 0.0000],
+         [0.6065, 0.3935],
+         [0.0000, 1.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[1],
+		[[0.0000, 0.0000, 1.0000],
+         [1.0000, 0.0000, 0.0000],
+         [0.3435, 0.3728, 0.2837],
+         [0.0000, 0.0000, 1.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.3435, 0.3728, 0.2837],
+         [0.2564, 0.2308, 0.5128],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 0.0000, 1.0000],
+         [0.2564, 0.6154, 0.1282]], 4)
+
+	assert_array_almost_equal(y_hat[2],
+		[[1.0000, 0.0000],
+         [0.2997, 0.7003],
+         [0.3935, 0.6065],
+         [0.0000, 1.0000],
+         [0.8025, 0.1975],
+         [1.0000, 0.0000],
+         [0.3935, 0.6065],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[3],
+		[[1.0000, 0.0000],
+         [0.6530, 0.3470],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.3728, 0.6272],
+         [0.4737, 0.5263],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.2308, 0.7692],
+         [1.0000, 0.0000],
+         [0.4737, 0.5263]], 4)
+
+
+def test_predict_log_proba_diamond(X_masked, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+	y_hat = model.predict_log_proba(X_masked)
+
+	assert_array_almost_equal(y_hat[0], 
+		numpy.log([[0.3000, 0.7000],
+         [1.0000, 0.0000],
+         [0.4700, 0.5300],
+         [0.0000, 1.0000],
+         [0.2416, 0.7584],
+         [1.0000, 0.0000],
+         [0.4700, 0.5300],
+         [0.0000, 1.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [1.0000, 0.0000]]), 3)
+
+	assert_array_almost_equal(y_hat[1],
+		numpy.log([[0.0000, 0.0000, 1.0000],
+         [1.0000, 0.0000, 0.0000],
+         [0.7000, 0.1000, 0.2000],
+         [0.0000, 0.0000, 1.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.7000, 0.1000, 0.2000],
+         [0.5147, 0.4706, 0.0147],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 0.0000, 1.0000],
+         [0.7204, 0.1844, 0.0952]]), 3)
+
+	assert_array_almost_equal(y_hat[2],
+		numpy.log([[1.0000, 0.0000],
+         [0.4000, 0.6000],
+         [0.5000, 0.5000],
+         [0.0000, 1.0000],
+         [0.1387, 0.8613],
+         [1.0000, 0.0000],
+         [0.5000, 0.5000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000]]), 3)
+
+	assert_array_almost_equal(y_hat[3],
+		numpy.log([[1.0000, 0.0000],
+         [0.4500, 0.5500],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.0968, 0.9032],
+         [0.3488, 0.6512],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.3488, 0.6512],
+         [1.0000, 0.0000],
+         [0.6818, 0.3182]]), 3)
+
+
+def test_predict_cycle(X, X_masked, distributions):
+	model = BayesianNetwork(structure=((1,), (2,), (3,), (0,))).fit(X)
+	y_hat = model.predict(X_masked)
+	print(y_hat)
+
+	assert_array_equal(y_hat,
+		[[1, 2, 0, 0],
+         [0, 0, 1, 0],
+         [0, 1, 1, 0],
+         [1, 2, 1, 1],
+         [1, 1, 0, 1],
+         [0, 1, 0, 1],
+         [0, 1, 1, 0],
+         [1, 2, 1, 1],
+         [1, 1, 0, 1],
+         [0, 2, 1, 0],
+         [0, 1, 0, 1]])
+
+
+def test_predict_diamond(X_masked, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+	y_hat = model.predict(X_masked)
+
+	assert_array_equal(y_hat,
+		[[1, 2, 0, 0],
+         [0, 0, 1, 1],
+         [1, 0, 0, 0],
+         [1, 2, 1, 1],
+         [1, 1, 1, 1],
+         [0, 1, 0, 1],
+         [1, 0, 0, 0],
+         [1, 0, 1, 1],
+         [1, 1, 0, 1],
+         [0, 2, 1, 0],
+         [0, 0, 0, 0]])
+
+
+def test_fit(X, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.fit(X)
+	assert_array_almost_equal(model.distributions[0].probs[0],
+		[[[1.0000, 0.0000],
+         [0.5000, 0.5000]],
+
+        [[0.5000, 0.5000],
+         [0.0000, 1.0000]],
+
+        [[0.0000, 1.0000],
+         [0.5000, 0.5000]]])
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.2000, 0.4000, 0.4000],
+         [0.3333, 0.5000, 0.1667]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.4000, 0.6000],
+         [0.6667, 0.3333]], 4)
+	assert_array_almost_equal(model.distributions[3].probs, 
+		[[0.4545, 0.5455]], 4)
+
+
+def test_fit_weighted(X, w, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.fit(X, sample_weight=w)
+	assert_array_almost_equal(model.distributions[0].probs[0],
+		[[[1.0000, 0.0000],
+          [1.0000, 0.0000]],
+
+         [[0.5701, 0.4299],
+          [0.5000, 0.5000]],
+
+         [[0.5000, 0.5000],
+          [0.2000, 0.8000]]], 4)
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.8125, 0.0000, 0.1875],
+         [0.2171, 0.7039, 0.0789]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.0000, 1.0000],
+         [0.9211, 0.0789]], 4)
+	assert_array_almost_equal(model.distributions[3].probs, 
+		[[0.0952, 0.9048]], 4)
+
+
+def test_fit_structure(X):
+	model = BayesianNetwork(structure=((1, 2), (3,), (3,), ()))
+	model.fit(X)
+
+	assert_array_almost_equal(model.distributions[0].probs[0],
+		[[[1.0000, 0.0000],
+         [0.5000, 0.5000]],
+
+        [[0.5000, 0.5000],
+         [0.0000, 1.0000]],
+
+        [[0.0000, 1.0000],
+         [0.5000, 0.5000]]])
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.2000, 0.4000, 0.4000],
+         [0.3333, 0.5000, 0.1667]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.4000, 0.6000],
+         [0.6667, 0.3333]], 4)
+	assert_array_almost_equal(model.distributions[3].probs, 
+		[[0.4545, 0.5455]], 4)
+
+
+def test_fit_fg(X, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.fit(X)
+	assert_array_almost_equal(model._factor_graph.factors[0].probs,
+		[[[0.1667, 0.0000],
+          [0.0833, 0.0833]],
+
+         [[0.0833, 0.0833],
+          [0.0000, 0.1667]],
+
+         [[0.0000, 0.1667],
+          [0.0833, 0.0833]]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[1].probs, 
+		[[0.1000, 0.2000, 0.2000],
+         [0.1667, 0.2500, 0.0833]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[2].probs,
+		[[0.2000, 0.3000],
+         [0.3333, 0.1667]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[3].probs, 
+		[[0.4545, 0.5455]], 4)
+
+
+def test_fit_weighted_fg(X, w, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.fit(X, sample_weight=w)
+	assert_array_almost_equal(model._factor_graph.factors[0].probs,
+		[[[0.1667, 0.0000],
+          [0.1667, 0.0000]],
+
+         [[0.0950, 0.0717],
+          [0.0833, 0.0833]],
+
+         [[0.0833, 0.0833],
+          [0.0333, 0.1333]]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[1].probs, 
+		[[0.4062, 0.0000, 0.0938],
+         [0.1086, 0.3520, 0.0395]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[2].probs,
+		[[0.0000, 0.5000],
+         [0.4605, 0.0395]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[3].probs, 
+		[[0.0952, 0.9048]], 4)
+
+
+def test_fit_predict_proba(X, X_masked, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+	y_hat = model.predict_proba(X_masked)
+
+	assert_array_almost_equal(y_hat[0], 
+		[[0.3000, 0.7000],
+         [1.0000, 0.0000],
+         [0.4700, 0.5300],
+         [0.0000, 1.0000],
+         [0.2416, 0.7584],
+         [1.0000, 0.0000],
+         [0.4700, 0.5300],
+         [0.0000, 1.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[1],
+		[[0.0000, 0.0000, 1.0000],
+         [1.0000, 0.0000, 0.0000],
+         [0.7000, 0.1000, 0.2000],
+         [0.0000, 0.0000, 1.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.7000, 0.1000, 0.2000],
+         [0.5147, 0.4706, 0.0147],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 0.0000, 1.0000],
+         [0.7204, 0.1844, 0.0952]], 4)
+
+	assert_array_almost_equal(y_hat[2],
+		[[1.0000, 0.0000],
+         [0.4000, 0.6000],
+         [0.5000, 0.5000],
+         [0.0000, 1.0000],
+         [0.1387, 0.8613],
+         [1.0000, 0.0000],
+         [0.5000, 0.5000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[3],
+		[[1.0000, 0.0000],
+         [0.4500, 0.5500],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.0968, 0.9032],
+         [0.3488, 0.6512],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.3488, 0.6512],
+         [1.0000, 0.0000],
+         [0.6818, 0.3182]], 4)
+
+	model.fit(X)
+	y_hat = model.predict_proba(X_masked)
+
+	assert_array_almost_equal(y_hat[0], 
+		[[0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [0.3400, 0.6600],
+         [0.0000, 1.0000],
+         [0.2800, 0.7200],
+         [1.0000, 0.0000],
+         [0.3400, 0.6600],
+         [0.0000, 1.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[1],
+		[[0.0000, 0.0000, 1.0000],
+         [1.0000, 0.0000, 0.0000],
+         [0.2000, 0.4000, 0.4000],
+         [0.0000, 0.0000, 1.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 1.0000, 0.0000],
+         [0.2000, 0.4000, 0.4000],
+         [0.2222, 0.6667, 0.1111],
+         [0.0000, 1.0000, 0.0000],
+         [0.0000, 0.0000, 1.0000],
+         [0.5532, 0.4468, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[2],
+		[[1.0000, 0.0000],
+         [0.7324, 0.2676],
+         [0.4000, 0.6000],
+         [0.0000, 1.0000],
+         [0.5600, 0.4400],
+         [1.0000, 0.0000],
+         [0.4000, 0.6000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [1.0000, 0.0000]], 4)
+
+	assert_array_almost_equal(y_hat[3],
+		[[1.0000, 0.0000],
+         [0.2958, 0.7042],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.4000, 0.6000],
+         [0.2857, 0.7143],
+         [1.0000, 0.0000],
+         [0.0000, 1.0000],
+         [0.2857, 0.7143],
+         [1.0000, 0.0000],
+         [0.2553, 0.7447]], 4)
+
+
+def test_learn_structure_chow_liu(X):
+	X = numpy.array(X)
+	X[:,1] = X[:,3]
+
+	model = BayesianNetwork(algorithm='chow-liu')
+	model.fit(X)
+
+	assert_array_equal(model._parents, ((), (0,), (1,), (1,)))
+
+	assert_array_almost_equal(model.distributions[0].probs,
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.6000, 0.4000], [0.3333, 0.6667]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.4000, 0.6000], [0.6667, 0.3333]], 4)
+	assert_array_almost_equal(model.distributions[3].probs[0], 
+		[[1., 0.], [0., 1.]], 4)
+
+	assert_array_almost_equal(model._factor_graph.factors[0].probs, 
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[1].probs, 
+		[[0.3000, 0.2000], [0.1667, 0.3333]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[2].probs, 
+		[[0.2000, 0.3000], [0.3333, 0.1667]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[3].probs, 
+		[[0.5000, 0.0000], [0.0000, 0.5000]], 4)
+
+
+def test_learn_structure_exact(X):
+	X = numpy.array(X)
+	X[:,1] = X[:,3]
+
+	model = BayesianNetwork(algorithm='exact')
+	model.fit(X)
+
+	assert_array_equal(model._parents, ((), (), (), (1, 2)))
+
+	assert_array_almost_equal(model.distributions[0].probs,
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model.distributions[1].probs, 
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model.distributions[2].probs,
+		[[0.5455, 0.4545]], 4)
+	assert_array_almost_equal(model.distributions[3].probs[0], 
+		[[[1., 0.],
+          [1., 0.]],
+
+         [[0., 1.],
+          [0., 1.]]], 4)
+
+	assert_array_almost_equal(model._factor_graph.factors[0].probs, 
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[1].probs, 
+		[[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[2].probs, 
+		[[0.5455, 0.4545]], 4)
+	assert_array_almost_equal(model._factor_graph.factors[3].probs, 
+		[[[0.25, 0.],
+          [0.25, 0.]],
+
+         [[0., 0.25],
+          [0., 0.25]]], 4)
+
+
+def test_summarize(X, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.summarize(X[:4])
+	model.summarize(X[4:])
+	model.from_summaries()
+
+	assert_array_almost_equal(model.distributions[0].probs[0],
+		[[[1.0000, 0.0000],
+         [0.5000, 0.5000]],
+
+        [[0.5000, 0.5000],
+         [0.0000, 1.0000]],
+
+        [[0.0000, 1.0000],
+         [0.5000, 0.5000]]])
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.2000, 0.4000, 0.4000],
+         [0.3333, 0.5000, 0.1667]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.4000, 0.6000],
+         [0.6667, 0.3333]], 4)
+	assert_array_almost_equal(model.distributions[3].probs, 
+		[[0.4545, 0.5455]], 4)
+
+
+def test_summarize_weighted(X, w, distributions):
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d13, d22, d32, d4], [(d4, d22), (d4, d32), 
+		(d22, d13), (d32, d13)])
+
+	model.summarize(X[:4], sample_weight=w[:4])
+	model.summarize(X[4:], sample_weight=w[4:])
+	model.from_summaries()
+
+	assert_array_almost_equal(model.distributions[0].probs[0],
+		[[[1.0000, 0.0000],
+          [1.0000, 0.0000]],
+
+         [[0.5701, 0.4299],
+          [0.5000, 0.5000]],
+
+         [[0.5000, 0.5000],
+          [0.2000, 0.8000]]], 4)
+	assert_array_almost_equal(model.distributions[1].probs[0], 
+		[[0.8125, 0.0000, 0.1875],
+         [0.2171, 0.7039, 0.0789]], 4)
+	assert_array_almost_equal(model.distributions[2].probs[0],
+		[[0.0000, 1.0000],
+         [0.9211, 0.0789]], 4)
+	assert_array_almost_equal(model.distributions[3].probs, 
+		[[0.0952, 0.9048]], 4)

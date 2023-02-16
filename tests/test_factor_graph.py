@@ -31,6 +31,11 @@ def X():
 
 
 @pytest.fixture
+def w():
+	return [0, 1.3, 0, 1.2, 2.5, 6.1, 0, 0, 2.1, 0.3, 3.3]
+
+
+@pytest.fixture
 def X_masked(X):
 	mask = torch.tensor(numpy.array([
 		[False, True,  True,  True ],
@@ -276,6 +281,60 @@ def test_add_edge_raises():
 	assert_raises(ValueError, model.add_edge, None, f1)
 	assert_raises(ValueError, model.add_edge, m1, None)
 	assert_raises(ValueError, model.add_edge, m1, m1)
+
+
+def test_probability(X, model, model2):
+	prob = model.probability(X)
+	assert_array_almost_equal(prob, [1.663520e-04, 2.242500e-04, 5.004999e-04, 
+		2.102100e-04, 2.935625e-04, 4.384369e-05, 4.968956e-05, 1.751750e-04,
+		2.935625e-04, 5.979991e-05, 8.768743e-05])
+
+	prob = model2.probability(X)
+	assert_array_almost_equal(prob, [5.133332e-05, 9.199999e-05, 7.186660e-05, 
+		2.587201e-04, 3.079999e-04, 9.774998e-06, 2.606666e-05, 2.156001e-04,
+		3.079999e-04, 2.299997e-05, 2.932498e-05])
+
+
+def test_log_probability(X, model, model2):
+	prob = model.log_probability(X)
+	assert_array_almost_equal(prob, [-8.701405,  -8.402749,  -7.599903,  
+		-8.467403,  -8.13342 , -10.03488 ,  -9.909716,  -8.649725,  -8.13342 ,  
+		-9.724506, -9.341732])
+
+	prob = model2.log_probability(X)
+	assert_array_almost_equal(prob, [-9.877171,  -9.293722,  -9.540699,  
+		-8.259764,  -8.085411, -11.535683, -10.554853,  -8.442085,  -8.085411, 
+		-10.680017, -10.437071])
+
+
+def test_predict(X_masked, model, model2):
+	y_hat = model.predict(X_masked)
+	assert_array_almost_equal(y_hat,
+		[[1, 2, 0, 0],
+         [0, 0, 1, 0],
+         [1, 0, 1, 0],
+         [1, 2, 1, 1],
+         [1, 1, 1, 0],
+         [0, 1, 0, 0],
+         [1, 0, 1, 0],
+         [1, 1, 1, 1],
+         [1, 1, 0, 0],
+         [0, 2, 1, 0],
+         [0, 0, 0, 0]])
+
+	y_hat = model2.predict(X_masked)
+	assert_array_almost_equal(y_hat,
+	    [[1, 2, 0, 0],
+         [0, 0, 1, 0],
+         [1, 0, 1, 0],
+         [1, 2, 1, 1],
+         [1, 1, 1, 1],
+         [0, 1, 0, 0],
+         [1, 0, 1, 0],
+         [1, 1, 1, 1],
+         [1, 1, 0, 1],
+         [0, 2, 1, 0],
+         [0, 0, 0, 0]])
 
 
 def test_predict_proba_one_edge():
@@ -560,3 +619,163 @@ def test_predict_proba_cycle(model2, X_masked):
          [0.1429, 0.8571],
          [1.0000, 0.0000],
          [0.6897, 0.3103]], 4)
+
+
+def test_fit(X, model, model2):
+	model.fit(X)
+	assert_array_almost_equal(model.factors[0].probs, [[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model.factors[1].probs, 
+		[[[0.0909, 0.1818, 0.0000],
+          [0.0909, 0.0000, 0.0909]],
+
+         [[0.0000, 0.1818, 0.0909],
+          [0.0909, 0.0909, 0.0909]]], 4)
+	assert_array_almost_equal(model.factors[2].probs, [[0.5455, 0.4545]], 4)
+	assert_array_almost_equal(model.factors[3].probs, 
+		[[0.1818, 0.3636],
+         [0.2727, 0.1818]], 4)
+
+	assert_array_almost_equal(model.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[3].probs, [[0.5, 0.5]])
+
+
+	model2.fit(X)
+	assert_array_almost_equal(model2.factors[0].probs, [[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model2.factors[1].probs, 
+		[[[0.0000, 0.0909, 0.0909],
+          [0.0909, 0.2727, 0.0000]],
+
+         [[0.0909, 0.0909, 0.0909],
+          [0.0909, 0.0000, 0.0909]]], 4)
+	assert_array_almost_equal(model2.factors[2].probs, 
+		[[0.2727, 0.1818],
+         [0.2727, 0.2727]], 4)
+	assert_array_almost_equal(model2.factors[3].probs, 
+		[[0.2727, 0.1818],
+         [0.1818, 0.3636]], 4)
+
+	assert_array_almost_equal(model2.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model2.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[3].probs, [[0.5, 0.5]])
+
+
+def test_fit_weighted(X, w, model, model2):
+	model.fit(X, sample_weight=w)
+
+	assert_array_almost_equal(model.factors[0].probs, [[0.6548, 0.3452]], 4)
+	assert_array_almost_equal(model.factors[1].probs, 
+		[[[0.1964, 0.3631, 0.0000],
+          [0.0774, 0.0000, 0.0179]],
+
+         [[0.0000, 0.2738, 0.0000],
+          [0.0000, 0.0000, 0.0714]]], 4)
+	assert_array_almost_equal(model.factors[2].probs, [[0.8333, 0.1667]], 4)
+	assert_array_almost_equal(model.factors[3].probs, 
+		[[0.0000, 0.8333],
+         [0.0952, 0.0714]], 4)
+
+	assert_array_almost_equal(model.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[3].probs, [[0.5, 0.5]])
+
+
+	model2.fit(X, sample_weight=w)
+	assert_array_almost_equal(model2.factors[0].probs, [[0.6548, 0.3452]], 4)
+	assert_array_almost_equal(model2.factors[1].probs, 
+		[[[0.0000, 0.0000, 0.0000],
+          [0.1964, 0.6369, 0.0000]],
+
+         [[0.0774, 0.0000, 0.0179],
+          [0.0000, 0.0000, 0.0714]]], 4)
+	assert_array_almost_equal(model2.factors[2].probs, 
+		[[0.5595, 0.0952],
+         [0.2738, 0.0714]], 4)
+	assert_array_almost_equal(model2.factors[3].probs, 
+		[[0.0952, 0.5595],
+         [0.0000, 0.3452]], 4)
+
+	assert_array_almost_equal(model2.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model2.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[3].probs, [[0.5, 0.5]])
+
+
+def test_summarize(X, model, model2):
+	model.summarize(X)
+	assert_array_almost_equal(model.factors[0].probs, [[0.23, 0.77]])
+	assert_array_almost_equal(model.factors[1].probs, [
+		[[0.10, 0.05, 0.05], [0.15, 0.05, 0.04]],
+		[[0.20, 0.10, 0.05], [0.05, 0.10, 0.06]]
+	])
+	assert_array_almost_equal(model.factors[2].probs, [[0.61, 0.39]])
+	assert_array_almost_equal(model.factors[3].probs, 
+		[[0.17, 0.15], [0.4, 0.28]])
+
+	assert_array_almost_equal(model.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[3].probs, [[0.5, 0.5]])
+
+
+	model2.summarize(X)
+	assert_array_almost_equal(model2.factors[0].probs, [[0.23, 0.77]], 4)
+	assert_array_almost_equal(model2.factors[1].probs, [
+		[[0.10, 0.05, 0.05], [0.15, 0.05, 0.04]],
+		[[0.20, 0.10, 0.05], [0.05, 0.10, 0.06]]
+	])
+	assert_array_almost_equal(model2.factors[2].probs, 
+		[[0.17, 0.15], [0.4, 0.28]])
+	assert_array_almost_equal(model2.factors[3].probs, 
+		[[0.32, 0.12], [0.08, 0.48]])
+
+	assert_array_almost_equal(model2.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model2.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[3].probs, [[0.5, 0.5]])
+
+
+def test_from_summarize(X, model, model2):
+	model.summarize(X)
+	model.from_summaries()
+	assert_array_almost_equal(model.factors[0].probs, [[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model.factors[1].probs, 
+		[[[0.0909, 0.1818, 0.0000],
+          [0.0909, 0.0000, 0.0909]],
+
+         [[0.0000, 0.1818, 0.0909],
+          [0.0909, 0.0909, 0.0909]]], 4)
+	assert_array_almost_equal(model.factors[2].probs, [[0.5455, 0.4545]], 4)
+	assert_array_almost_equal(model.factors[3].probs, 
+		[[0.1818, 0.3636],
+         [0.2727, 0.1818]], 4)
+
+	assert_array_almost_equal(model.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model.marginals[3].probs, [[0.5, 0.5]])
+
+
+	model2.summarize(X)
+	model2.from_summaries()
+	assert_array_almost_equal(model2.factors[0].probs, [[0.4545, 0.5455]], 4)
+	assert_array_almost_equal(model2.factors[1].probs, 
+		[[[0.0000, 0.0909, 0.0909],
+          [0.0909, 0.2727, 0.0000]],
+
+         [[0.0909, 0.0909, 0.0909],
+          [0.0909, 0.0000, 0.0909]]], 4)
+	assert_array_almost_equal(model2.factors[2].probs, 
+		[[0.2727, 0.1818],
+         [0.2727, 0.2727]], 4)
+	assert_array_almost_equal(model2.factors[3].probs, 
+		[[0.2727, 0.1818],
+         [0.1818, 0.3636]], 4)
+
+	assert_array_almost_equal(model2.marginals[0].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[1].probs, [[1./3, 1./3, 1./3]])
+	assert_array_almost_equal(model2.marginals[2].probs, [[0.5, 0.5]])
+	assert_array_almost_equal(model2.marginals[3].probs, [[0.5, 0.5]])

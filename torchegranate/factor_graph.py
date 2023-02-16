@@ -117,6 +117,9 @@ class FactorGraph(Distribution):
 		self.tol = _check_parameter(tol, "tol", min_value=0)
 		self.verbose = verbose
 
+		self.d = 0
+		self._initialized = factors is not None and factors[0]._initialized
+
 		if factors is not None:
 			_check_parameter(factors, "factors", dtypes=(list, tuple))
 
@@ -134,6 +137,17 @@ class FactorGraph(Distribution):
 
 			for marginal, factor in edges:
 				self.add_edge(marginal, factor)
+
+		self._initialized = not factors
+
+
+	def _initialize(self, d):
+		self._initialized = True
+		super()._initialize(d)
+
+
+	def _reset_cache(self):
+		return
 
 
 	def add_factor(self, distribution):
@@ -154,9 +168,14 @@ class FactorGraph(Distribution):
 		self._factor_edges.append([])
 		self._factor_idxs[distribution] = len(self.factors) - 1
 
+		self._initialized = distribution._initialized
+
+
 	def add_marginal(self, distribution):
 		"""Adds a distribution to the set of marginals.
 
+		This adds a distribution to the marginal side of the bipartate graph.
+		This distribution must be univariate. 
 
 		Parameters
 		----------
@@ -170,6 +189,9 @@ class FactorGraph(Distribution):
 		self.marginals.append(distribution)
 		self._marginal_edges.append([])
 		self._marginal_idxs[distribution] = len(self.marginals) - 1
+
+		self.d += 1
+
 
 	def add_edge(self, marginal, factor):
 		"""Adds an undirected edge to the set of edges.
@@ -198,6 +220,74 @@ class FactorGraph(Distribution):
 
 		self._factor_edges[f_idx].append(m_idx)
 		self._marginal_edges[m_idx].append(f_idx)
+
+
+	@torch.inference_mode()
+	def log_probability(self, X):
+		"""Calculate the log probability of each example.
+
+		This method calculates the log probability of each example given the
+		parameters of the distribution. The examples must be given in a 2D
+		format.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to evaluate.
+
+		Returns
+		-------
+		logp: torch.Tensor, shape=(-1,)
+			The log probability of each example.
+		"""
+
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		
+		logps = torch.zeros(X.shape[0], device=X.device, dtype=torch.float32)
+		for idxs, factor in zip(self._factor_edges, self.factors):
+			logps += factor.log_probability(X[:, idxs])
+
+		for i, marginal in enumerate(self.marginals):
+			logps += marginal.log_probability(X[:, i:i+1])
+
+		return logps
+
+
+	@torch.inference_mode()
+	def predict(self, X):
+		"""Infers the maximum likelihood value for each missing value.
+
+		This method infers a probability distribution for each of the missing
+		values in the data. First, the sum-product algorithm is run to infer
+		a probability distribution for each variable. Then, the maximum
+		likelihood value is returned from that distribution.
+
+		The input to this method must be a torch.masked.MaskedTensor where the
+		mask specifies which variables are observed (mask = True) and which ones
+		are not observed (mask = False) for each of the values. When setting
+		mask = False, it does not matter what the corresponding value in the
+		tensor is. Different sets of variables can be observed or missing in
+		different examples. 
+
+		Unlike the `predict_proba` and `predict_log_proba` methods, this
+		method preserves the dimensions of the original data because it does
+		not matter how many categories a variable can take when you're only
+		returning the maximally likely one.
+
+
+		Parameters
+		----------
+		X: torch.masked.MaskedTensor
+			A masked tensor where the observed values are available and the
+			unobserved values are missing, i.e., the mask is True for
+			observed values and the mask is False for missing values. It does
+			not matter what the underlying value in the tensor is for the 
+			missing values.
+		"""
+
+		y = [t.argmax(dim=1) for t in self.predict_proba(X)]
+		return torch.vstack(y).T.contiguous()
 
 
 	@torch.inference_mode()
@@ -367,3 +457,129 @@ class FactorGraph(Distribution):
 
 
 		return current_marginals
+
+
+	def predict_log_proba(self, X):
+		"""Infers the probability of each category given the model and data.
+
+		This method is a wrapper around the `predict_proba` method and simply
+		takes the log of each returned tensor.
+
+		This method infers a log probability distribution for each of the 
+		missing  values in the data. It uses the factor graph representation of 
+		the Bayesian network to run the sum-product/loopy belief propogation
+		algorithm.
+
+		The input to this method must be a torch.masked.MaskedTensor where the
+		mask specifies which variables are observed (mask = True) and which ones
+		are not observed (mask = False) for each of the values. When setting
+		mask = False, it does not matter what the corresponding value in the
+		tensor is. Different sets of variables can be observed or missing in
+		different examples. 
+
+		An important note is that, because each variable can have a different
+		number of categories in the categorical setting, the return is a list
+		of tensors where each element in that list is the marginal probability
+		distribution for that variable. More concretely: the first element will
+		be the distribution of values for the first variable across all
+		examples. When the first variable has been provided as evidence, the
+		distribution will be clamped to the value provided as evidence.
+
+		..warning:: This inference is exact given a Bayesian network that has
+		a tree-like structure, but is only approximate for other cases. When
+		the network is acyclic, this procedure will converge, but if the graph
+		contains cycles then there is no guarantee on convergence.
+
+
+		Parameters
+		----------
+		X: torch.masked.MaskedTensor, shape=(-1, d)
+			The data to predict values for. The mask should correspond to
+			whether the variable is observed in the example. 
+		
+
+		Returns
+		-------
+		y: list of tensors, shape=(d,)
+			A list of tensors where each tensor contains the distribution of
+			values for that dimension.
+		"""
+
+		return [torch.log(t) for t in self.predict_proba(X)]
+		
+
+	def fit(self, X, sample_weight=None):
+		"""Fit the factors of the model to optionally weighted examples.
+
+		This method will fit the provided factor distributions to the given
+		data and their optional weights. It will not update the marginal
+		distributions, as that information is already encoded in the joint
+		probabilities.
+
+		..note:: A structure must already be provided. Currently, structure
+		learning of factor graphs is not supported.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to evaluate. 
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
+
+
+		Returns
+		-------
+		self
+		"""
+
+		self.summarize(X, sample_weight=sample_weight)
+		self.from_summaries()
+		return self
+
+
+	def summarize(self, X, sample_weight=None):
+		"""Extract the sufficient statistics from a batch of data.
+
+		This method calculates the sufficient statistics from optionally
+		weighted data and adds them to the stored cache for each distribution
+		in the network. Sample weights can either be provided as one
+		value per example or as a 2D matrix of weights for each feature in
+		each example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
+			A set of examples to summarize.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
+
+
+		Returns
+		-------
+		logp: torch.Tensor, shape=(-1,)
+			The log probability of each example.
+		"""
+
+		if self.frozen:
+			return
+
+		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
+		X = _check_parameter(X, "X", ndim=2)
+
+		for i, factor in enumerate(self.factors):
+			factor.summarize(X[:, self._factor_edges[i]], 
+				sample_weight=sample_weight[:,i])
+
+
+	def from_summaries(self):
+		if self.frozen:
+			return
+
+		for distribution in self.factors:
+			distribution.from_summaries()

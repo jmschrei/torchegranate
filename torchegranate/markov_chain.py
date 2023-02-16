@@ -48,8 +48,9 @@ class MarkovChain(Distribution):
 		super()._initialize(d)
 
 	def _reset_cache(self):
-		for distribution in self.distributions:
-			distribution._reset_cache()
+		if self._initialized:
+			for distribution in self.distributions:
+				distribution._reset_cache()
 
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)

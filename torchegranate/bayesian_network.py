@@ -8,6 +8,7 @@ import itertools
 import networkx as nx
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
@@ -105,7 +106,6 @@ class BayesianNetwork(Distribution):
 		self._factor_mapping = {}
 		self._distribution_mapping = {}
 		self._parents = []
-
 		self._factor_graph = FactorGraph()
 
 		self.algorithm = algorithm
@@ -119,7 +119,8 @@ class BayesianNetwork(Distribution):
 		self.verbose = verbose
 
 		self.d = 0
-		self._initialized = distributions is not None and distributions[0]._initialized
+		self._initialized = (distributions is not None and 
+			distributions[0]._initialized)
 		self._reset_cache()
 
 
@@ -469,6 +470,13 @@ class BayesianNetwork(Distribution):
 		self
 		"""
 
+		if self.algorithm is not None:
+			self.structure = _learn_structure(X, sample_weight=sample_weight, 
+				algorithm=self.algorithm, 
+				include_parents=self.include_parents, 
+				exclude_parents=self.exclude_parents, 
+				max_parents=self.max_parents, pseudocount=self.pseudocount)
+
 		if self.structure is not None:
 			distributions = _from_structure(X, sample_weight, self.structure)
 			self.add_distributions(distributions)
@@ -478,19 +486,36 @@ class BayesianNetwork(Distribution):
 					for parent in parents:
 						self.add_edge(distributions[parent], distributions[i])
 
-		elif self.algorithm is not None:
-			return _learn_structure(X, sample_weight, algorithm=self.algorithm, 
-				include_parents=self.include_parents, 
-				exclude_parents=self.exclude_parents, 
-				max_parents=self.max_parents, pseudocount=self.pseudocount)
-
-
-
 		self.summarize(X, sample_weight=sample_weight)
 		self.from_summaries()
 		return self
 
 	def summarize(self, X, sample_weight=None):
+		"""Extract the sufficient statistics from a batch of data.
+
+		This method calculates the sufficient statistics from optionally
+		weighted data and adds them to the stored cache for each distribution
+		in the network. Sample weights can either be provided as one
+		value per example or as a 2D matrix of weights for each feature in
+		each example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
+			A set of examples to summarize.
+
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+			A set of weights for the examples. This can be either of shape
+			(-1, self.d) or a vector of shape (-1,). Default is ones.
+
+
+		Returns
+		-------
+		logp: torch.Tensor, shape=(-1,)
+			The log probability of each example.
+		"""
+
 		if self.frozen:
 			return
 
@@ -502,11 +527,13 @@ class BayesianNetwork(Distribution):
 
 		for i, distribution in enumerate(self.distributions):
 			parents = self._parents[i] + (i,)
+			w = sample_weight[:, i]
 
 			if len(parents) == 1:
-				distribution.summarize(X[:, parents])
+				distribution.summarize(X[:, parents], sample_weight=w)
 			else:
-				distribution.summarize(X[:, parents].unsqueeze(-1))
+				distribution.summarize(X[:, parents].unsqueeze(-1), 
+					sample_weight=w)
 
 	def from_summaries(self):
 		if self.frozen:
@@ -514,6 +541,11 @@ class BayesianNetwork(Distribution):
 
 		for distribution in self.distributions:
 			distribution.from_summaries()
+
+			if isinstance(distribution, ConditionalCategorical):
+				p = torch.clone(distribution.probs[0])
+				p /= torch.prod(torch.tensor(p.shape[:-1]))
+				self._factor_mapping[distribution].probs = _cast_as_parameter(p)
 
 
 
@@ -654,9 +686,9 @@ def _learn_structure(X, sample_weight=None, algorithm='chow-liu',
 
 	Returns
 	-------
-	model: torchegranate.bayesian_network.BayesianNetwork
-		A Bayesian network object whose structure has been learned using the
-		specified algorithm and the parameters are fit to the provided data.
+	structure: tuple, shape=(d,)
+		A tuple of tuples, where each inner tuple represents a dimension in
+		the data and contains the parents of that dimension.
 	"""
 
 	X = _check_parameter(_cast_as_tensor(X), "X", min_value=0, ndim=2,
@@ -676,7 +708,7 @@ def _learn_structure(X, sample_weight=None, algorithm='chow-liu',
 			include_parents=include_parents, exclude_parents=exclude_parents, 
 			max_parents=max_parents, pseudocount=pseudocount)
 
-	return _from_structure(X, sample_weight, structure)
+	return structure
 
 
 def _categorical_chow_liu(X, sample_weight=None, pseudocount=0.0, root=0):

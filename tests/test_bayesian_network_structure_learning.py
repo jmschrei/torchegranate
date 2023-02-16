@@ -227,19 +227,19 @@ def test_categorical_learn_structure_chow_liu():
 
 	structure1 = _categorical_chow_liu(X)
 	structure2 = _learn_structure(X, algorithm='chow-liu')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_chow_liu(X, root=1)
 	structure2 = _learn_structure(X, root=1, algorithm='chow-liu')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_chow_liu(X, pseudocount=50)
 	structure2 = _learn_structure(X, pseudocount=50, algorithm='chow-liu')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_chow_liu(X, w)
 	structure2 = _learn_structure(X, w, algorithm='chow-liu')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 
 def test_categorical_learn_structure_exact():
@@ -249,19 +249,19 @@ def test_categorical_learn_structure_exact():
 
 	structure1 = _categorical_exact(X)
 	structure2 = _learn_structure(X, algorithm='exact')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_exact(X, max_parents=1)
 	structure2 = _learn_structure(X, max_parents=1, algorithm='exact')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_exact(X, pseudocount=50)
 	structure2 = _learn_structure(X, pseudocount=50, algorithm='exact')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 	structure1 = _categorical_exact(X, w)
 	structure2 = _learn_structure(X, w, algorithm='exact')
-	assert_array_equal(structure1, structure2._parents)
+	assert_array_equal(structure1, structure2)
 
 
 ###
@@ -269,8 +269,8 @@ def test_categorical_learn_structure_exact():
 
 def test_categorical_from_structure(X):
 	structure = ((), (0,), (1, 3), ())
-	
-	model = _from_structure(X, structure=structure)
+	distributions = _from_structure(X, structure=structure)
+	model = BayesianNetwork(distributions, structure=structure)
 
 	assert isinstance(model.distributions[0], Categorical)
 	assert isinstance(model.distributions[1], ConditionalCategorical)
@@ -283,7 +283,8 @@ def test_categorical_from_structure(X):
 	p3 = model.distributions[3].probs
 
 	assert_array_almost_equal(p0, [[0.454545, 0.545455]])
-	assert_array_almost_equal(p1, [[0.4     , 0.4     , 0.2     ], [0.166667, 0.5     , 0.333333]])
+	assert_array_almost_equal(p1, [[0.4     , 0.4     , 0.2     ], 
+		[0.166667, 0.5     , 0.333333]])
 	assert_array_almost_equal(p2, [[[0.0000, 1.0000],
          [0.5000, 0.5000]],
 
@@ -297,8 +298,8 @@ def test_categorical_from_structure(X):
 
 def test_categorical_from_structure_weighted(X, w):
 	structure = ((), (0,), (1, 3), ())
-	
-	model = _from_structure(X, sample_weight=w, structure=structure)
+	distributions = _from_structure(X, sample_weight=w, structure=structure)
+	model = BayesianNetwork(distributions, structure=structure)
 
 	assert isinstance(model.distributions[0], Categorical)
 	assert isinstance(model.distributions[1], ConditionalCategorical)
@@ -311,7 +312,8 @@ def test_categorical_from_structure_weighted(X, w):
 	p3 = model.distributions[3].probs
 
 	assert_array_almost_equal(p0, [[0.6719, 0.3281]], 4)
-	assert_array_almost_equal(p1, [[0.2674, 0.6047, 0.1279], [0.2381, 0.5238, 0.2381]], 4)
+	assert_array_almost_equal(p1, [[0.2674, 0.6047, 0.1279], 
+		[0.2381, 0.5238, 0.2381]], 4)
 	assert_array_almost_equal(p2, [[[0.0000, 1.0000],
          [0.6667, 0.3333]],
 
@@ -321,3 +323,24 @@ def test_categorical_from_structure_weighted(X, w):
         [[0.4762, 0.5238],
          [0.5000, 0.5000]]], 4)
 	assert_array_almost_equal(p3, [[0.5078, 0.4922]], 4)
+
+
+def test_categorical_from_structure_null(X):
+	structure = ((), (), (), ())
+	distributions = _from_structure(X, structure=structure)
+	model = BayesianNetwork(distributions, structure=structure)
+
+	assert isinstance(model.distributions[0], Categorical)
+	assert isinstance(model.distributions[1], Categorical)
+	assert isinstance(model.distributions[2], Categorical)
+	assert isinstance(model.distributions[3], Categorical)
+
+	p0 = model.distributions[0].probs
+	p1 = model.distributions[1].probs
+	p2 = model.distributions[2].probs
+	p3 = model.distributions[3].probs
+
+	assert_array_almost_equal(p0, [[0.454545, 0.545455]])
+	assert_array_almost_equal(p1, [[0.272727, 0.454545, 0.272727]])
+	assert_array_almost_equal(p2, [[0.5455, 0.4545]], 4)
+	assert_array_almost_equal(p3, [[0.4545, 0.5455]], 4)
