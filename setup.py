@@ -14,6 +14,7 @@ setup(
 		'scipy >= 1.6.2',
 		'scikit-learn >= 1.0.2',
 		'torch >= 1.9.0',
-		'apricot-select >= 0.6.1'
+		'apricot-select >= 0.6.1',
+		'networkx >= 2.8.4'
 	]
 )
