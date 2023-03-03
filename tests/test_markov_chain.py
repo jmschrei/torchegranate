@@ -103,6 +103,25 @@ def test_initialize(X):
 ###
 
 
+def test_sample(model):
+	torch.manual_seed(0)
+
+	X = model.sample(1)
+	assert_array_almost_equal(X, [[[2], [1], [2]]])
+
+	X = model.sample(5)
+	assert_array_almost_equal(X, 
+		[[[1], [2], [0]],
+         [[2], [2], [2]],
+         [[0], [2], [0]],
+         [[2], [1], [0]],
+         [[0], [0], [2]]], 3)
+
+
+###
+
+
+
 def test_log_probability(model, X):
 	logp = model.log_probability(X)
 	assert_array_almost_equal(logp, [-3.3932, -5.3391, -5.7446, -4.9337, 

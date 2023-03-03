@@ -213,6 +213,24 @@ def test_initialize(X):
 ###
 
 
+def test_sample(lambdas):
+	torch.manual_seed(0)
+
+	X = Poisson(lambdas).sample(1)
+	assert_array_almost_equal(X, [[3., 2., 2.]])
+
+	X = Poisson(lambdas).sample(5)
+	assert_array_almost_equal(X, 
+		[[1., 2., 2.],
+         [2., 1., 1.],
+         [2., 2., 2.],
+         [2., 2., 1.],
+         [1., 3., 4.]], 3)
+
+
+###
+
+
 def test_probability(X, lambdas):
 	p = [1.7]
 	x = [[1.0], [2.0], [8.0], [3.7], [1.9]]

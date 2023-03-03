@@ -276,6 +276,45 @@ class BayesianNetwork(Distribution):
 		for edge in edges:
 			self.add_edge(*edge)
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution. For a mixture model, this involves first
+		sampling the component using the prior probabilities, and then sampling
+		from the chosen distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		X = torch.zeros(n, self.d, dtype=torch.int32) - 1
+
+		for i in range(self.d):
+			for j, parents in enumerate(self._parents):
+				if (X[0, j] != -1).item():
+					continue
+
+				if len(parents) == 0:
+					X[:, j] = self.distributions[j].sample(n)[:, 0]
+				else:
+					X_ = X[:, parents].unsqueeze(-1)
+					if (X_ == -1).any().item():
+						continue
+
+					X[:, j] = self.distributions[j].sample(n, X_)[:, 0]
+
+		return X
+
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
 
@@ -536,6 +575,16 @@ class BayesianNetwork(Distribution):
 					sample_weight=w)
 
 	def from_summaries(self):
+		"""Update the model parameters given the extracted statistics.
+
+		This method uses calculated statistics from calls to the `summarize`
+		method to update the distribution parameters. Hyperparameters for the
+		update are passed in at initialization time.
+
+		Note: Internally, a call to `fit` is just a successive call to the
+		`summarize` method followed by the `from_summaries` method.
+		"""
+
 		if self.frozen:
 			return
 

@@ -245,6 +245,31 @@ def test_add_edge_raises(distributions):
 	assert_raises(ValueError, model.add_edge, d1, d3)
 
 
+###
+
+
+def test_sample(distributions):
+	torch.manual_seed(0)
+
+	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
+	model = BayesianNetwork([d1, d22, d13, d4], [(d1, d22), (d22, d13), 
+		(d4, d13)])
+
+	X = model.sample(1)
+	assert_array_equal(X, [[1, 1, 1, 1]])
+
+	X = model.sample(5)
+	assert_array_equal(X, 
+		[[0, 0, 1, 1],
+         [0, 0, 0, 1],
+         [0, 2, 1, 0],
+         [0, 1, 1, 1],
+         [0, 0, 1, 1]])
+
+
+###
+
+
 def test_log_probability(X, distributions):
 	d1, d2, d3, d4, d12, d22, d32, d13 = distributions
 

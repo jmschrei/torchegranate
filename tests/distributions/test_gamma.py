@@ -311,6 +311,23 @@ def test_initialize(X):
 ###
 
 
+def test_sample(shapes, rates):
+	torch.manual_seed(0)
+
+	X = Gamma(shapes, rates).sample(1)
+	assert_array_almost_equal(X, [[10.794655,  0.367495,  0.568067]])
+
+	X = Gamma(shapes, rates).sample(5)
+	assert_array_almost_equal(X, 
+		[[0.3594, 0.2441, 1.0691],
+         [0.9625, 1.0465, 0.9298],
+         [4.2083, 0.6331, 3.7465],
+         [3.5261, 1.1585, 1.4492],
+         [1.1837, 0.5522, 2.1590]], 3)
+
+
+###
+
 def test_probability(X, shapes, rates):
 	s, r = [1.7], [1.3]
 	x = [[1.0], [2.0], [8.0], [3.7], [1.9]]

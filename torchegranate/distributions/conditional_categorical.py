@@ -78,6 +78,48 @@ class ConditionalCategorical(ConditionalDistribution):
 
 		self._log_probs = BufferList([torch.log(prob) for prob in self.probs])
 
+	def sample(self, n, X):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution. For a mixture model, this involves first
+		sampling the component using the prior probabilities, and then sampling
+		from the chosen distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+		X: list, numpy.ndarray, torch.tensor, shape=(n, d, *self.probs.shape-1) 
+			The values to be conditioned on when generating the samples.
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+			shape=(-1, self.n_parents-1, self.d))
+
+		y = []
+		for i in range(n):
+			y.append([])
+
+			for j in range(self.d):
+				idx = tuple(X[i, :, j])
+				if len(idx) == 1:
+					idx = idx[0].item()
+				
+				probs = self.probs[j][idx]
+
+				y_ = torch.multinomial(probs, 1).item()
+				y[-1].append(y_)
+
+		return torch.tensor(y)
+
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
 			shape=(-1, self.n_parents, self.d))
@@ -90,9 +132,6 @@ class ConditionalCategorical(ConditionalDistribution):
 				logps[i] += self._log_probs[j][tuple(X[i, :, j])]
 
 		return logps
-
-	def marginal(self, dim=0):
-		return Categorical(self.probs.sum(dim=dim))
 
 	def summarize(self, X, sample_weight=None):
 		if self.frozen == True:

@@ -129,6 +129,24 @@ def test_initialize(X):
 ###
 
 
+def test_sample(model):
+	torch.manual_seed(0)
+
+	X = model.sample(1)
+	assert_array_almost_equal(X, [[7.367485, 0.369115, 0.061504]])
+
+	X = model.sample(5)
+	assert_array_almost_equal(X, 
+		[[0.9082, 0.2612, 0.0340],
+         [1.2255, 2.7453, 2.5202],
+         [2.0425, 0.1972, 0.0581],
+         [1.0984, 0.0690, 0.1094],
+         [3.2267, 0.0709, 0.1129]], 3)
+
+
+###
+
+
 def test_emission_matrix(model, X):
 	e = model._emission_matrix(X)
 

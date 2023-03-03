@@ -94,6 +94,27 @@ class Bernoulli(Distribution):
 		self.register_buffer("_log_probs", torch.log(self.probs))
 		self.register_buffer("_log_inv_probs", torch.log(-(self.probs-1)))
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		return torch.distributions.Bernoulli(self.probs).sample([n])
+
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
 

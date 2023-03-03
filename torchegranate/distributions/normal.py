@@ -160,6 +160,31 @@ class Normal(Distribution):
 				self.register_buffer("_log_sigma_sqrt_2pi", _log_sigma_sqrt_2pi)
 				self.register_buffer("_inv_two_sigma", _inv_two_sigma)
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		if self.covariance_type == 'diag':
+			return torch.distributions.Normal(self.means, self.covs).sample([n])
+		elif self.covariance_type == 'full':
+			return torch.distributions.MultivariateNormal(self.means, 
+				self.covs).sample([n])
+
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
 

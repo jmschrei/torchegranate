@@ -159,6 +159,36 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		self._reset_cache()
 		super()._initialize(X.shape[1])
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution. For a mixture model, this involves first
+		sampling the component using the prior probabilities, and then sampling
+		from the chosen distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		X = []
+		for distribution in self.distributions:
+			X_ = distribution.sample(n)
+			X.append(X_)
+
+		X = torch.stack(X)
+		idxs = torch.multinomial(self.priors, num_samples=n, replacement=True)
+		return X[idxs, torch.arange(n)]
+
 	def fit(self, X, sample_weight=None):
 		"""Fit the model to optionally weighted examples.
 

@@ -172,6 +172,23 @@ def test_initialize(X):
 
 ###
 
+def test_sample(probs):
+	torch.manual_seed(0)
+
+	X = Bernoulli(probs).sample(1)
+	assert_array_almost_equal(X, [[0, 1, 1]])
+
+	X = Bernoulli(probs).sample(5)
+	assert_array_almost_equal(X, 
+		[[0., 1., 0.],
+         [0., 0., 0.],
+         [0., 1., 0.],
+         [1., 1., 1.],
+         [0., 1., 0.]])
+
+
+###
+
 
 def test_probability(X, probs):
 	p = [0.32]

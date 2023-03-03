@@ -280,6 +280,24 @@ def test_initialize(X):
 ###
 
 
+def test_sample(means, covs):
+	torch.manual_seed(0)
+
+	X = Normal(means, covs, covariance_type='full').sample(1)
+	assert_array_almost_equal(X, [[2.044038,  1.659515, -0.229191]])
+
+	X = Normal(means, covs, covariance_type='full').sample(5)
+	assert_array_almost_equal(X, 
+		[[1.5113, 0.3447, 0.2308],
+         [1.4209, 3.0784, 1.7213],
+         [0.9791, 0.8686, 2.0354],
+         [0.7308, 3.2258, 1.4744],
+         [1.2672, 1.0083, 2.2415]], 3)
+
+
+###
+
+
 def test_probability(X, means, covs):
 	m, c = [1.7], [[1.3]]
 	x = [[1.0], [2.0], [4.0], [3.7], [1.9]]

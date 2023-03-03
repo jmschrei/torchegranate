@@ -275,6 +275,23 @@ def test_initialize(X):
 	assert_array_almost_equal(d._x_maxs, [NEGINF, NEGINF, NEGINF, NEGINF])	
 
 
+###
+
+
+def test_sample(mins, maxs):
+	torch.manual_seed(0)
+
+	X = Uniform(mins, maxs).sample(1)
+	assert_array_almost_equal(X, [[1.491016, 2.427843, 1.132716]])
+
+	X = Uniform(mins, maxs).sample(5)
+	assert_array_almost_equal(X, 
+		[[0.6169, 1.0915, 1.9511],
+         [1.4762, 2.7997, 1.6834],
+         [1.8175, 1.2118, 1.6026],
+         [0.3536, 0.6897, 1.4408],
+         [1.5445, 2.2232, 2.2000]], 3)
+
 
 ###
 

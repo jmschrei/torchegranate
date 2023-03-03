@@ -213,6 +213,24 @@ def test_initialize(X):
 ###
 
 
+def test_sample(scales):
+	torch.manual_seed(0)
+
+	X = Exponential(scales).sample(1)
+	assert_array_almost_equal(X, [[4.209991, 2.214692, 1.291593]])
+
+	X = Exponential(scales).sample(5)
+	assert_array_almost_equal(X, 
+		[[3.0421, 1.8643, 3.2889],
+         [0.2361, 0.7785, 1.8285],
+         [0.4080, 1.0855, 0.4086],
+         [0.5267, 1.7507, 1.3807],
+         [0.6975, 0.9415, 0.4829]], 3)
+
+
+###
+
+
 def test_probability(X, scales):
 	p = [1.7]
 	x = [[1.0], [2.0], [8.0], [3.7], [1.9]]

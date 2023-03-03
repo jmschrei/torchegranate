@@ -248,6 +248,24 @@ def test_initialize(X, probs):
 ###
 
 
+def test_sample(probs):
+	torch.manual_seed(0)
+
+	X = JointCategorical(probs).sample(1)
+	assert_array_almost_equal(X, [[1, 2, 1]])
+
+	X = JointCategorical(probs).sample(5)
+	assert_array_almost_equal(X, 
+		[[1, 1, 0],
+         [0, 2, 1],
+         [1, 2, 1],
+         [1, 0, 1],
+         [1, 1, 1]], 3)
+
+
+###
+
+
 def test_probability(X, probs):
 	y = [0.04, 0.125, 0.04, 0.04, 0.05, 0.05, 0.053333]
 

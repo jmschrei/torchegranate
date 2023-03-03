@@ -97,6 +97,27 @@ class StudentT(Normal):
 		self.register_buffer("_log_sqrt_dofs_pi_cov", torch.log(torch.sqrt(
 			self.dofs * math.pi * self.covs)))
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		return torch.distributions.StudentT(self.means, self.covs).sample([n])
+
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
 

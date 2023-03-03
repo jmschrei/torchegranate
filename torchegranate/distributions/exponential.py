@@ -2,6 +2,7 @@
 # Contact: Jacob Schreiber <jmschreiber91@gmail.com>
 
 import torch
+from torch.distributions import Exponential as tExponential
 
 from .._utils import _cast_as_tensor
 from .._utils import _cast_as_parameter
@@ -92,6 +93,27 @@ class Exponential(Distribution):
 		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
 
 		self.register_buffer("_log_scales", torch.log(self.scales))
+
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: torch.tensor, shape=(n, self.d)
+			Randomly generated samples.
+		"""
+
+		return tExponential(1. / self.scales).sample([n])
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

@@ -239,6 +239,32 @@ def test_initialize(X, probs):
 ###
 
 
+def test_sample(probs, X):
+	torch.manual_seed(0)
+
+	X = ConditionalCategorical(probs).sample(1, [[[0, 1, 0]]])
+	assert_array_almost_equal(X, [[1, 0, 1]])
+
+	x = [
+		[[0, 1, 0]],
+		[[1, 1, 0]],
+		[[0, 0, 0]],
+		[[0, 0, 0]],
+		[[1, 0, 1]]
+	]
+
+	X = ConditionalCategorical(probs).sample(5, x)
+	assert_array_almost_equal(X, 
+		[[1, 1, 1],
+         [0, 1, 1],
+         [1, 1, 0],
+         [0, 1, 1],
+         [1, 1, 0]], 3)
+
+
+###
+
+
 def test_probability(X, probs):
 	y = [0.08512, 0.00768, 0.18088, 0.02688, 0.0784 , 0.0204 , 0.02625]
 

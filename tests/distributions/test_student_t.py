@@ -331,6 +331,25 @@ def test_initialize(X):
 ###
 
 
+def test_sample(means, covs):
+	torch.manual_seed(0)
+
+	X = StudentT(3, means, covs).sample(1)
+	assert_array_almost_equal(X, [[2.290756,  2.747659, -0.361462]])
+
+	X = StudentT(3, means, covs).sample(5)
+	assert_array_almost_equal(X, 
+		[[ 1.2340,  3.7050, -1.7784],
+         [-0.3130,  0.7819,  1.6609],
+         [ 0.6525,  4.5185,  1.4070],
+         [-1.2491,  2.8038,  0.3782],
+         [-0.4787,  2.9747,  0.3687]], 3)
+
+
+###
+
+
+
 def test_probability(X, means, covs):
 	m, c = [1.7], [1.3]
 	x = [[1.0], [2.0], [4.0], [3.7], [1.9]]
