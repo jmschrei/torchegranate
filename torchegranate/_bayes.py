@@ -28,7 +28,7 @@ class BayesMixin(torch.nn.Module):
 		self.register_buffer("_w_sum", torch.zeros(self.k, device=self.device))
 		self.register_buffer("_log_priors", torch.log(self.priors))
 
-	def _emission_matrix(self, X):
+	def _emission_matrix(self, X, y=None):
 		"""Return the emission/responsibility matrix.
 
 		This method returns the log probability of each example under each
@@ -40,6 +40,12 @@ class BayesMixin(torch.nn.Module):
 		----------
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to evaluate. 
+
+		y: torch.nn.MaskedTensor or None, optional
+			An incomplete set of labels where the mask indicates what labels
+			are observed. When provided, semi-supervised learning is performed,
+			otherwise normal unsupervised learning is performed. Default is
+			None.
 
 	
 		Returns
@@ -55,7 +61,16 @@ class BayesMixin(torch.nn.Module):
 		for i, d in enumerate(self.distributions):
 			e[:, i] = d.log_probability(X)
 
-		return e + self._log_priors
+		e += self._log_priors
+
+		if y is not None:
+			idxs = torch.where(y._masked_mask)[0]
+			e[idxs] = float("-inf")
+			e[idxs, y._masked_data[idxs]] = 0
+
+		print(e[:20])
+
+		return e
 
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.

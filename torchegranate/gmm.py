@@ -189,7 +189,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		idxs = torch.multinomial(self.priors, num_samples=n, replacement=True)
 		return X[idxs, torch.arange(n)]
 
-	def fit(self, X, sample_weight=None):
+	def fit(self, X, sample_weight=None, y=None):
 		"""Fit the model to optionally weighted examples.
 
 		This method implements the core of the learning process. For a
@@ -207,10 +207,15 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to evaluate. 
 
-		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
+		sample_weight: list, tuple, numpy.ndarray, torch.Tensor optional
 			A set of weights for the examples. This can be either of shape
 			(-1, self.d) or a vector of shape (-1,). Default is ones.
 
+		y: torch.nn.MaskedTensor or None, optional
+			An incomplete set of labels where the mask indicates what labels
+			are observed. When provided, semi-supervised learning is performed,
+			otherwise normal unsupervised learning is performed. Default is
+			None.
 
 		Returns
 		-------
@@ -222,7 +227,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 			start_time = time.time()
 
 			last_logp = logp
-			logp = self.summarize(X, sample_weight=sample_weight)
+			logp = self.summarize(X, sample_weight=sample_weight, y=y)
 
 			if i > 0:
 				improvement = logp - last_logp
@@ -240,14 +245,15 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		self._reset_cache()
 		return self
 
-	def summarize(self, X, sample_weight=None):
+	def summarize(self, X, sample_weight=None, y=None):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
 		weighted data and adds them to the stored cache. The examples must be
 		given in a 2D format. Sample weights can either be provided as one
 		value per example or as a 2D matrix of weights for each feature in
-		each example.
+		each example. Labels can be provided for examples but, if provided,
+		must be incomplete such that semi-supervised learning can be performed.
 
 		For a mixture model, this step is essentially performing the 'E' part
 		of the EM algorithm on a batch of data, where examples are soft-assigned
@@ -262,6 +268,12 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
 			(-1, self.d) or a vector of shape (-1,). Default is ones.
+
+		y: torch.nn.MaskedTensor or None, optional
+			An incomplete set of labels where the mask indicates what labels
+			are observed. When provided, semi-supervised learning is performed,
+			otherwise normal unsupervised learning is performed. Default is
+			None.
 		"""
 
 		X = _cast_as_tensor(X)
@@ -273,7 +285,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
 			dtype=torch.float32), device=self.device)
 
-		e = self._emission_matrix(X)
+		e = self._emission_matrix(X, y=y)
 		logp = torch.logsumexp(e, dim=1, keepdims=True)
 		y = torch.exp(e - logp)
 
