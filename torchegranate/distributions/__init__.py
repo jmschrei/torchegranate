@@ -9,7 +9,6 @@ from .joint_categorical import JointCategorical
 from .lognormal import LogNormal
 from .normal import Normal
 from .poisson import Poisson
-from .silent import Silent
 from .student_t import StudentT
 from .uniform import Uniform
 from .zero_inflated import ZeroInflated
