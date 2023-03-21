@@ -248,6 +248,7 @@ def test_add_edge_raises(distributions):
 ###
 
 
+@pytest.mark.sample
 def test_sample(distributions):
 	torch.manual_seed(0)
 

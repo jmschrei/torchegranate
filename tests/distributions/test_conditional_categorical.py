@@ -239,6 +239,7 @@ def test_initialize(X, probs):
 ###
 
 
+@pytest.mark.sample
 def test_sample(probs, X):
 	torch.manual_seed(0)
 

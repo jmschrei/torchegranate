@@ -280,6 +280,7 @@ def test_initialize(X):
 ###
 
 
+@pytest.mark.sample
 def test_sample(means, covs):
 	torch.manual_seed(0)
 

@@ -64,11 +64,18 @@ class BayesMixin(torch.nn.Module):
 		e += self._log_priors
 
 		if y is not None:
+			if y._masked_data[y._masked_mask].min() < 0:
+				raise ValueError("y must be between 0 and num components.")
+			if y._masked_data[y._masked_mask].max() >= e.shape[1]:
+				raise ValueError("y must be between 0 and num components.")
+			if X.shape[0] != y.shape[0]:
+				raise ValueError("X.shape[0] and y.shape[0] must be the same.")
+			if len(y.shape) > 1:
+				raise ValueError("y must be a masked vector.")
+
 			idxs = torch.where(y._masked_mask)[0]
 			e[idxs] = float("-inf")
 			e[idxs, y._masked_data[idxs]] = 0
-
-		print(e[:20])
 
 		return e
 

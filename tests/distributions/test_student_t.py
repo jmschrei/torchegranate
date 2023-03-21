@@ -331,6 +331,7 @@ def test_initialize(X):
 ###
 
 
+@pytest.mark.sample
 def test_sample(means, covs):
 	torch.manual_seed(0)
 
@@ -347,7 +348,6 @@ def test_sample(means, covs):
 
 
 ###
-
 
 
 def test_probability(X, means, covs):

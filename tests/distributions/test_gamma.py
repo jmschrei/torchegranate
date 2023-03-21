@@ -307,10 +307,10 @@ def test_initialize(X):
 	assert_array_almost_equal(d._logx_w_sum, [0.0, 0.0, 0.0, 0.0])	
 
 
-
 ###
 
 
+@pytest.mark.sample
 def test_sample(shapes, rates):
 	torch.manual_seed(0)
 
