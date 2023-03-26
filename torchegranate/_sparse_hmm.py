@@ -11,7 +11,7 @@ from .distributions._distribution import Distribution
 
 from ._bayes import BayesMixin
 from ._base import GraphMixin
-from ._base import Node
+
 
 NEGINF = float("-inf")
 inf = float("inf")
@@ -99,18 +99,15 @@ class _SparseHMM(Distribution):
 		parameter directly. Default is False.
 	"""
 
-	def __init__(self, nodes, edges, start, end, starts=None, ends=None, 
-		max_iter=10, tol=0.1, sample_length=None, return_sample_paths=False,
-		inertia=0.0, frozen=False, random_state=None):
+	def __init__(self, nodes, edges, start, end, starts=None, ends=None, max_iter=10, 
+		tol=0.1, sample_length=None, return_sample_paths=False, inertia=0.0, 
+		frozen=False, random_state=None):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "_SparseHMM"
 
-		self.start = start
-		self.end = end
-
 		self.nodes = nodes
 		self.edges = _convert_to_sparse_edges(nodes, edges, starts, ends,
-			self.start, self.end)
+			start, end)
 
 		self.n_nodes = len(self.nodes)
 		self.n_edges = len(self.edges)
@@ -135,11 +132,11 @@ class _SparseHMM(Distribution):
 
 		idx = 0
 		for ni, nj, probability in self.edges:
-			if ni is self.start:
+			if ni is start:
 				j = self.nodes.index(nj)
 				self.starts[j] = math.log(probability)
 
-			elif nj is self.end:
+			elif nj is end:
 				i = self.nodes.index(ni)
 				self.ends[i] = math.log(probability)
 
@@ -233,7 +230,7 @@ class _SparseHMM(Distribution):
 
 		for _ in range(n):	
 			node_i = self.random_state.choice(self.n_nodes, p=starts)
-			emission_i = self.nodes[node_i].distribution.sample(n=1)
+			emission_i = self.nodes[node_i].sample(n=1)
 			nodes_, emissions_ = [node_i], [emission_i]
 
 			for i in range(1, self.sample_length or int(1e8)):
@@ -241,7 +238,7 @@ class _SparseHMM(Distribution):
 				if node_i == self.n_nodes:
 					break
 
-				emission_i = self.nodes[node_i].distribution.sample(n=1)
+				emission_i = self.nodes[node_i].sample(n=1)
 
 				nodes_.append(node_i)
 				emissions_.append(emission_i)
@@ -556,7 +553,7 @@ class _SparseHMM(Distribution):
 		r = torch.exp(r) * sample_weight.unsqueeze(1)
 		for i, node in enumerate(self.nodes):
 			w = r[:, :, i].reshape(-1, 1)
-			node.distribution.summarize(X, sample_weight=w)
+			node.summarize(X, sample_weight=w)
 
 		return logps
 
@@ -572,7 +569,7 @@ class _SparseHMM(Distribution):
 		"""
 
 		for node in self.nodes:
-			node.distribution.from_summaries()
+			node.from_summaries()
 
 		if self.frozen:
 			return

@@ -11,7 +11,7 @@ from .distributions._distribution import Distribution
 
 from ._bayes import BayesMixin
 from ._base import GraphMixin
-from ._base import Node
+
 
 NEGINF = float("-inf")
 inf = float("inf")
@@ -112,18 +112,15 @@ class _DenseHMM(Distribution):
 	"""
 
 
-	def __init__(self, nodes, edges, start, end, starts=None, ends=None, 
-		max_iter=10, tol=0.1, sample_length=None, return_sample_paths=False,
-		inertia=0.0, frozen=False, random_state=None):
+	def __init__(self, nodes, edges, start, end, starts=None, ends=None, max_iter=10, 
+		tol=0.1, sample_length=None, return_sample_paths=False, inertia=0.0, 
+		frozen=False, random_state=None):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "_DenseHMM"
 
-		self.start = start
-		self.end = end
-
 		self.nodes = torch.nn.ModuleList(nodes)
 		self.edges, self.starts, self.ends = _convert_to_dense_edges(nodes, 
-			edges, starts, ends, self.start, self.end)
+			edges, starts, ends, start, end)
 
 		self.n_nodes = len(nodes)
 		self.n_edges = len(edges)
@@ -198,7 +195,7 @@ class _DenseHMM(Distribution):
 
 		for _ in range(n):
 			node_i = self.random_state.choice(self.n_nodes, p=starts)
-			emission_i = self.nodes[node_i].distribution.sample(n=1)
+			emission_i = self.nodes[node_i].sample(n=1)
 			nodes_, emissions_ = [node_i], [emission_i]
 
 			for i in range(1, self.sample_length or int(1e8)):
@@ -208,7 +205,7 @@ class _DenseHMM(Distribution):
 				if node_i == self.n_nodes:
 					break
 
-				emission_i = self.nodes[node_i].distribution.sample(n=1)
+				emission_i = self.nodes[node_i].sample(n=1)
 
 				nodes_.append(node_i)
 				emissions_.append(emission_i)
@@ -516,7 +513,7 @@ class _DenseHMM(Distribution):
 		r = torch.exp(r) * sample_weight.unsqueeze(-1)
 		for i, node in enumerate(self.nodes):
 			w = r[:, :, i].reshape(-1, 1)
-			node.distribution.summarize(X, sample_weight=w)
+			node.summarize(X, sample_weight=w)
 
 		return logps
 
@@ -532,7 +529,7 @@ class _DenseHMM(Distribution):
 		"""
 
 		for node in self.nodes:
-			node.distribution.from_summaries()
+			node.from_summaries()
 
 		if self.frozen:
 			return

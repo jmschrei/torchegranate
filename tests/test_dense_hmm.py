@@ -177,8 +177,8 @@ def test_initialize(X):
 	d = [Exponential(), Exponential()]
 	model = HiddenMarkovModel(d, kind='dense', random_state=0)
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert model.d is None
 	assert model.n_nodes == 2
@@ -550,8 +550,8 @@ def test_predict_log_proba_raises(model, X):
 
 
 def test_partial_summarize(model, X):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 	model.summarize(X[:1])
 
 	assert_array_almost_equal(model._model._xw_sum,
@@ -579,8 +579,8 @@ def test_partial_summarize(model, X):
 
 
 def test_summarize(model, X):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 	model.summarize(X)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -596,8 +596,8 @@ def test_summarize(model, X):
 
 
 def test_summarize_weighted(model, X, w):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 	model.summarize(X, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -628,8 +628,8 @@ def test_summarize_raises(model, X, w):
 
 
 def test_from_summaries(model, X):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -649,8 +649,8 @@ def test_from_summaries(model, X):
 
 
 def test_from_summaries_weighted(model, X, w):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -676,8 +676,8 @@ def test_from_summaries_inertia(X):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.3)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -702,8 +702,8 @@ def test_from_summaries_inertia(X):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -728,8 +728,8 @@ def test_from_summaries_weighted_inertia(X, w):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.3)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -755,8 +755,8 @@ def test_from_summaries_weighted_inertia(X, w):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -781,8 +781,8 @@ def test_from_summaries_frozen(model, X):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', frozen=True)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -807,8 +807,8 @@ def test_from_summaries_frozen(model, X):
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -836,8 +836,8 @@ def test_fit(X):
 	model.bake()
 	model.fit(X)
 	
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-1.489857e+01, -3.385568e-07], 4)
 	assert_array_almost_equal(model.ends, [-1.110725, -1.609444])
@@ -859,8 +859,8 @@ def test_fit(X):
 	model.fit(X)
 
 	
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -885,8 +885,8 @@ def test_fit_weighted(X, w):
 	model.bake()
 	model.fit(X, sample_weight=w)
 	
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-1.5399e+01, -2.0519e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.732272, -1.609437])
@@ -908,8 +908,8 @@ def test_fit_weighted(X, w):
 	model.fit(X, sample_weight=w)
 
 	
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-1.6093e+01, -1.0250e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.469704, -1.609439])
@@ -1236,8 +1236,8 @@ def test_masked_ones_summarize(model, X, w):
 	mask = torch.ones_like(X).type(torch.bool)
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 	model.summarize(X_, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -1254,8 +1254,8 @@ def test_masked_ones_summarize(model, X, w):
 
 
 def test_masked_summarize(model, X, X_masked, w):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 	model.summarize(X_masked, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -1276,8 +1276,8 @@ def test_masked_ones_from_summaries(model, X, w):
 	mask = torch.ones_like(X).type(torch.bool)
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X_, sample_weight=w)
 	model.from_summaries()
@@ -1298,8 +1298,8 @@ def test_masked_ones_from_summaries(model, X, w):
 
 
 def test_masked_from_summaries(model, X_masked, w):
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	model.summarize(X_masked, sample_weight=w)
 	model.from_summaries()
@@ -1331,8 +1331,8 @@ def test_masked_fit(X, X_masked):
 	model.fit(X_)
 
 	
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -1354,8 +1354,8 @@ def test_masked_fit(X, X_masked):
 	model.bake()
 	model.fit(X_masked + 1)
 
-	d1 = model.nodes[0].distribution
-	d2 = model.nodes[1].distribution
+	d1 = model.nodes[0]
+	d2 = model.nodes[1]
 
 	assert_array_almost_equal(model.starts, [-16.6664,   0.0000], 4)
 	assert_array_almost_equal(model.ends, [-0.9247, -1.7014], 4)

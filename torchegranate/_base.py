@@ -4,12 +4,6 @@
 import math
 import torch
 
-class Node(torch.nn.Module):
-	def __init__(self, distribution, name):
-		super().__init__()
-
-		self.distribution = distribution
-		self.name = name
 
 class GraphMixin(torch.nn.Module):
 	def add_node(self, node):

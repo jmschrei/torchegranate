@@ -14,7 +14,6 @@ from .distributions._distribution import Distribution
 
 from ._bayes import BayesMixin
 from ._base import GraphMixin
-from ._base import Node
 
 from ._sparse_hmm import _SparseHMM
 from ._dense_hmm import _DenseHMM
@@ -25,6 +24,9 @@ from .kmeans import KMeans
 NEGINF = float("-inf")
 _parameter = lambda x: torch.nn.Parameter(x, requires_grad=False)
 
+class Silent(torch.nn.Module):
+	def __init__(self):
+		pass
 
 def _cast_distributions(distributions):
 	if distributions is None:
@@ -32,10 +34,8 @@ def _cast_distributions(distributions):
 
 	nodes = []
 	for i, distribution in enumerate(distributions):
-		if isinstance(distribution, Node):
+		if isinstance(distribution, Distribution):
 			nodes.append(distribution)
-		elif isinstance(distribution, Distribution):
-			nodes.append(Node(distribution, str(i)))
 		else:
 			raise ValueError("Nodes must be node or distribution objects.")
 
@@ -187,6 +187,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		elif self.edges is None and nodes is None:
 			self.edges = []
 
+		self.start = Silent()
+		self.end = Silent()
 
 		if self.starts is None and nodes is not None:
 			self.starts = torch.ones(self.n_nodes) / self.n_nodes
@@ -194,9 +196,6 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		if self.ends is None and nodes is not None:
 			self.ends = torch.ones(self.n_nodes) / self.n_nodes
 
-
-		self.start = Node(None, "start")
-		self.end = Node(None, "end")
 
 		self.kind = kind
 		self.init = init
@@ -210,9 +209,9 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.random_state = random_state
 		self.verbose = verbose
 
-		self.d = self.nodes[0].distribution.d if nodes is not None else None
+		self.d = self.nodes[0].d if nodes is not None else None
 		self._model = None
-		self._initialized = all(n.distribution._initialized for n in self.nodes)
+		self._initialized = all(n._initialized for n in self.nodes)
 
 	def bake(self):
 		"""Finalize the model after adding in edges manually.
@@ -226,8 +225,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		if self.kind == 'dense':
 			self._model = _DenseHMM(nodes=self.nodes, edges=self.edges,
 				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, tol=self.tol, 
-				sample_length=self.sample_length, 
+				ends=self.ends, max_iter=self.max_iter, 
+				tol=self.tol, sample_length=self.sample_length, 
 				return_sample_paths=self.return_sample_paths,
 				inertia=self.inertia, random_state=self.random_state, 
 				frozen=self.frozen)
@@ -235,8 +234,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		elif self.kind == 'sparse':
 			self._model = _SparseHMM(nodes=self.nodes, edges=self.edges,
 				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, tol=self.tol,
-				sample_length=self.sample_length, 
+				ends=self.ends, max_iter=self.max_iter, 
+				tol=self.tol, sample_length=self.sample_length, 
 				return_sample_paths=self.return_sample_paths,
 				random_state=self.random_state, inertia=self.inertia, 
 				frozen=self.frozen)
@@ -255,7 +254,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		self._model._reset_cache()
 		for node in self.nodes:
-			node.distribution._reset_cache()
+			node._reset_cache()
 
 		if self.kind == 'sparse':
 			self.edges = self._model._edge_log_probs
@@ -298,7 +297,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			sample_weight=sample_weight)
 
 		for i in range(self.n_nodes):
-			self.nodes[i].distribution.fit(X[y_hat == i], 
+			self.nodes[i].fit(X[y_hat == i], 
 				sample_weight=sample_weight[y_hat == i])
 
 		self._initialized = True
@@ -336,7 +335,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			requires_grad=False, device=self.device)
 		
 		for i, node in enumerate(self.nodes):
-			logp = node.distribution.log_probability(X)
+			logp = node.log_probability(X)
 			if isinstance(logp, torch.masked.MaskedTensor):
 				logp = logp._masked_data
 
