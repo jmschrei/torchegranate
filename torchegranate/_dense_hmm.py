@@ -113,7 +113,8 @@ class _DenseHMM(Distribution):
 
 
 	def __init__(self, nodes, edges, start, end, starts=None, ends=None, 
-		max_iter=10, tol=0.1, inertia=0.0, frozen=False):
+		max_iter=10, tol=0.1, sample_length=None, return_sample_paths=False,
+		inertia=0.0, frozen=False, random_state=None):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "_DenseHMM"
 
@@ -126,6 +127,14 @@ class _DenseHMM(Distribution):
 
 		self.n_nodes = len(nodes)
 		self.n_edges = len(edges)
+
+		self.sample_length = sample_length
+		self.return_sample_paths = return_sample_paths
+
+		if not isinstance(random_state, numpy.random.RandomState):
+			self.random_state = numpy.random.RandomState(random_state)
+		else:
+			self.random_state = random_state
 
 		if torch.isinf(self.starts).sum() == len(self.starts):
 			self.starts = _cast_as_parameter(torch.ones(self.n_nodes) 
@@ -154,6 +163,62 @@ class _DenseHMM(Distribution):
 		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
 			dtype=torch.float32, requires_grad=False, device=self.device))
 
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution. Because a HMM describes variable length
+		sequences, a list will be returned where each element is one of
+		the generated sequences.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: list of torch.tensor, shape=(n,)
+			A list of randomly generated samples, where each sample of
+			size (length, self.d).
+		"""
+
+		if self.sample_length is None and self.ends is None:
+			raise ValueError("Must specify a length or have explicit "
+				+ "end probabilities.")
+
+		nodes, emissions = [], []
+
+		edge_probs = torch.hstack([self.edges, self.ends.unsqueeze(1)])
+		edge_probs = torch.exp(edge_probs).numpy()
+
+		starts = torch.exp(self.starts).numpy()
+
+		for _ in range(n):
+			node_i = self.random_state.choice(self.n_nodes, p=starts)
+			emission_i = self.nodes[node_i].distribution.sample(n=1)
+			nodes_, emissions_ = [node_i], [emission_i]
+
+			for i in range(1, self.sample_length or int(1e8)):
+				node_i = self.random_state.choice(self.n_nodes+1, 
+					p=edge_probs[node_i])
+
+				if node_i == self.n_nodes:
+					break
+
+				emission_i = self.nodes[node_i].distribution.sample(n=1)
+
+				nodes_.append(node_i)
+				emissions_.append(emission_i)
+
+			nodes.append(nodes_)
+			emissions.append(torch.vstack(emissions_))
+
+		if self.return_sample_paths == True:
+			return emissions, nodes
+		return emissions
 
 	@torch.inference_mode()
 	def forward(self, emissions, priors):

@@ -17,6 +17,7 @@ from .distributions._utils import _test_raises
 
 from nose.tools import assert_raises
 from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_equal
 
 
 MIN_VALUE = 0
@@ -72,7 +73,7 @@ def model():
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
-		kind='dense')
+		kind='dense', random_state=0)
 	model.bake()
 	return model
 
@@ -96,6 +97,9 @@ def test_initialization():
 	assert_raises(AttributeError, getattr, model._model, "_xw_sum")
 	assert_raises(AttributeError, getattr, model._model, "_xw_starts_sum")
 	assert_raises(AttributeError, getattr, model._model, "_xw_ends_sum")
+
+	model.bake()
+	assert isinstance(model._model, _DenseHMM)
 
 
 def test_initialization_raises():
@@ -199,6 +203,81 @@ def test_initialize(X):
 
 	assert_array_almost_equal(d1.scales, [1.5, 1. , 2. ])
 	assert_array_almost_equal(d2.scales, [1.75, 1.25, 0.  ])
+
+
+###
+
+
+@pytest.mark.sample
+def test_sample(model):
+	torch.manual_seed(0)
+
+	X = model.sample(1)
+	assert_array_almost_equal(X[0],
+		[[5.2625, 3.8142, 1.3531],
+         [3.8027, 3.2107, 3.4455],
+         [0.2951, 1.3407, 1.9155],
+         [0.5100, 1.8695, 0.4280],
+         [0.6584, 3.0151, 1.4465],
+         [0.8719, 1.6214, 0.5059],
+         [1.6406, 4.7632, 0.5196],
+         [1.6939, 0.3603, 1.6320]], 4)
+
+	X = model.sample(3)
+	assert_array_almost_equal(X[0],
+		[[0.3843, 2.5327, 1.9483],
+         [1.7183, 4.2407, 0.5683],
+         [2.4902, 3.0871, 0.4796],
+         [0.2486, 2.0362, 5.4891]], 3)
+	assert_array_almost_equal(X[1],
+		[[1.7823e+00, 1.9666e-01, 1.5899e-01],
+         [9.6352e-01, 9.5312e-02, 4.2323e-03],
+         [2.9002e+00, 1.2545e-01, 7.7268e-02],
+         [9.4207e-01, 6.1731e+00, 9.2237e-02],
+         [8.8499e+00, 6.5642e+00, 3.1673e+00],
+         [4.4337e-01, 6.5174e-01, 9.6875e+00]], 3)
+	assert_array_almost_equal(X[2],
+		[[2.2685e+00, 1.3926e+00, 1.8356e+00],
+         [2.0275e+00, 1.3866e-02, 1.9275e+00],
+         [1.2650e+00, 1.5342e-01, 3.9146e-01],
+         [1.3925e+01, 2.7539e-01, 1.6151e-02],
+         [7.5165e-01, 6.1712e+00, 2.5927e-01],
+         [3.4823e+00, 4.6675e-01, 1.5978e-01]], 3)
+
+
+def test_sample_length(model):
+	starts = [0.2, 0.8]
+	ends = [0.1, 0.1]
+
+	edges = [[0.1, 0.8],
+	         [0.3, 0.6]]
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
+		kind='dense', sample_length=3, random_state=0)
+	model.bake()
+
+	X = model.sample(25)
+	assert max([len(x) for x in X]) <= 3
+
+
+def test_sample_paths(model):
+	torch.manual_seed(0)
+
+	starts = [0.2, 0.8]
+	ends = [0.1, 0.1]
+
+	edges = [[0.4, 0.5],
+	         [0.6, 0.3]]
+
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
+		kind='dense', return_sample_paths=True, random_state=0)
+	model.bake()
+
+	X, path = model.sample(1)
+	assert_array_equal(path[0],
+		[1, 1, 1, 0, 1, 1, 0, 1])
 
 
 ###

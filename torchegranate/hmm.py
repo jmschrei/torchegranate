@@ -162,7 +162,8 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 	def __init__(self, nodes=None, edges=None, starts=None, ends=None, 
 		kind="sparse", init='random', max_iter=1000, tol=0.1, 
-		inertia=0.0, frozen=False, random_state=None, verbose=False):
+		sample_length=None, return_sample_paths=False, inertia=0.0, 
+		frozen=False, random_state=None, verbose=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "HiddenMarkovModel"
 
@@ -202,6 +203,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.max_iter = _check_parameter(max_iter, "max_iter", min_value=1, 
 			ndim=0, dtypes=(int, torch.int32, torch.int64))
 		self.tol = _check_parameter(tol, "tol", min_value=0., ndim=0)
+
+		self.sample_length = sample_length
+		self.return_sample_paths = return_sample_paths
+
 		self.random_state = random_state
 		self.verbose = verbose
 
@@ -222,13 +227,19 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			self._model = _DenseHMM(nodes=self.nodes, edges=self.edges,
 				start=self.start, end=self.end, starts=self.starts, 
 				ends=self.ends, max_iter=self.max_iter, tol=self.tol, 
-				inertia=self.inertia, frozen=self.frozen)
+				sample_length=self.sample_length, 
+				return_sample_paths=self.return_sample_paths,
+				inertia=self.inertia, random_state=self.random_state, 
+				frozen=self.frozen)
 
 		elif self.kind == 'sparse':
 			self._model = _SparseHMM(nodes=self.nodes, edges=self.edges,
 				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, tol=self.tol, 
-				inertia=self.inertia, frozen=self.frozen)
+				ends=self.ends, max_iter=self.max_iter, tol=self.tol,
+				sample_length=self.sample_length, 
+				return_sample_paths=self.return_sample_paths,
+				random_state=self.random_state, inertia=self.inertia, 
+				frozen=self.frozen)
 
 		self.n_nodes = self._model.n_nodes
 		self.n_edges = self._model.n_edges
@@ -332,6 +343,30 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			e[:, i] = logp.reshape(n, k).T
 
 		return e.permute(2, 0, 1)
+
+	def sample(self, n):
+		"""Sample from the probability distribution.
+
+		This method will return `n` samples generated from the underlying
+		probability distribution. Because a HMM describes variable length
+		sequences, a list will be returned where each element is one of
+		the generated sequences.
+
+
+		Parameters
+		----------
+		n: int
+			The number of samples to generate.
+		
+
+		Returns
+		-------
+		X: list of torch.tensor, shape=(n,)
+			A list of randomly generated samples, where each sample of
+			size (length, self.d).
+		"""
+
+		return self._model.sample(n=n)
 
 	def forward(self, X=None, emissions=None, priors=None, check_inputs=True):
 		"""Run the forward algorithm on some data.
