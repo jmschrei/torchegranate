@@ -1,3 +1,6 @@
+# _dense_hmm.py
+# Author: Jacob Schreiber <jmschreiber91@gmail.com>
+
 import math
 import numpy
 import torch

@@ -240,6 +240,15 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 				random_state=self.random_state, inertia=self.inertia, 
 				frozen=self.frozen)
 
+		elif self.kind == 'compressed':
+			self._model = _CompressedHMM(nodes=self.nodes, edges=self.edges,
+				start=self.start, end=self.end, starts=self.starts, 
+				ends=self.ends, max_iter=self.max_iter, 
+				tol=self.tol, sample_length=self.sample_length, 
+				return_sample_paths=self.return_sample_paths,
+				random_state=self.random_state, inertia=self.inertia, 
+				frozen=self.frozen)			
+
 		self.n_nodes = self._model.n_nodes
 		self.n_edges = self._model.n_edges
 
