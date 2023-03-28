@@ -8,11 +8,11 @@
 > **Note**
 > This is a temporary repository that will host code until the main functionality of pomegranate is reproduced. Then, the code here will be merged back into the main pomegranate repo.
 
-torchegranate is a rewrite of the ![pomegranate](https://github.com/jmschrei/pomegranate) library to use PyTorch as a backend. It implements probabilistic models with a modular implementation, enabling greater flexibility in terms of model creation than most models allow. Specifically, one can drop any probability distribution into any compositional model, e.g., drop Poisson distributions into a mixture model, to create any model desired without needing to explicitly hardcode each potential model. Because one is defining the distributions to use in each of the compositional models, there is no limitation on the models being homogenous -- one can create a mixture of a exponential distribution and a gamma distribution just as easily as creating a mixture entirely composed of gamma distributions. 
+torchegranate is a rewrite of the [pomegranate](https://github.com/jmschrei/pomegranate) library to use PyTorch as a backend. It implements probabilistic models with a modular implementation, enabling greater flexibility in terms of model creation than most models allow. Specifically, one can drop any probability distribution into any compositional model, e.g., drop Poisson distributions into a mixture model, to create any model desired without needing to explicitly hardcode each potential model. Because one is defining the distributions to use in each of the compositional models, there is no limitation on the models being homogenous -- one can create a mixture of a exponential distribution and a gamma distribution just as easily as creating a mixture entirely composed of gamma distributions. 
 
 But that's not all! A core aspect of pomegranate's philosophy is that every probabilistic model is a probability distribution. Hidden Markov models are simply distributions over sequences and Bayesian networks are joint probability tables that are broken down according to the conditional independences defined in a graph. Functionally, this means that one can drop a mixture model into a hidden Markov model to use as an emission just as easily as one can drop an individual distribution. As part of the roadmap, and made part in possible due to the flexibility of PyTorch, complete cross-functionality should be possible, such as a Bayes classifier with hidden Markov models or a mixture of Bayesian networks.
 
-Special shout-out to ![NumFOCUS](https://numfocus.org/) for supporting this work with a special development grant.
+Special shout-out to [NumFOCUS](https://numfocus.org/) for supporting this work with a special development grant.
 
 ### Installation
 
