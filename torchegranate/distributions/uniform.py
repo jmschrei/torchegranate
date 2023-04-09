@@ -79,8 +79,10 @@ class Uniform(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.mins = _cast_as_parameter(torch.zeros(d, device=self.device))
-		self.maxs = _cast_as_parameter(torch.zeros(d, device=self.device))
+		self.mins = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+			device=self.device))
+		self.maxs = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+			device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)

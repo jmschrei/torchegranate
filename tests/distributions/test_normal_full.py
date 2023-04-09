@@ -539,10 +539,10 @@ def test_summarize_dtypes(X, w, means, covs):
 	assert d._xw_sum.dtype == torch.float32
 
 	X = X.astype(numpy.float64)
-	d = Normal(means, covs, covariance_type='full')
-	assert d._xw_sum.dtype == torch.float32
+	d = Normal(means, covs, covariance_type='full').type(torch.float64)
+	assert d._xw_sum.dtype == torch.float64
 	d.summarize(X)
-	assert d._xw_sum.dtype == torch.float32
+	assert d._xw_sum.dtype == torch.float64
 
 	X = X.astype(numpy.int32)
 	d = Normal(means, covs, covariance_type='full')

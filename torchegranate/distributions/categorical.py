@@ -90,7 +90,7 @@ class Categorical(Distribution):
 		"""
 
 		self.probs = _cast_as_parameter(torch.zeros(d, n_keys, 
-			device=self.device))
+			dtype=self.dtype, device=self.device))
 
 		self.n_keys = n_keys
 		self._initialized = True

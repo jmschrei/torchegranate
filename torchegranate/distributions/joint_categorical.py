@@ -115,7 +115,8 @@ class JointCategorical(Distribution):
 			Default is None.
 		"""
 
-		self.probs = _cast_as_parameter(torch.zeros(*n_categories))
+		self.probs = _cast_as_parameter(torch.zeros(*n_categories, 
+			dtype=self.dtype, device=self.device))
 
 		self.n_categories = n_categories
 		self._initialized = True

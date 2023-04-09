@@ -103,7 +103,8 @@ class BayesClassifier(BayesMixin, Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.priors = _cast_as_parameter(torch.ones(self.k) / self.k)
+		self.priors = _cast_as_parameter(torch.ones(self.k, dtype=self.dtype, 
+			device=self.device) / self.k)
 
 		self._initialized = True
 		super()._initialize(d)

@@ -57,7 +57,8 @@ class ConditionalCategorical(ConditionalDistribution):
 
 		self.n_parents = len(self.n_categories[0])
 		self.probs = torch.nn.ParameterList([_cast_as_parameter(torch.zeros(
-			*cats, device=self.device, requires_grad=False)) for cats in self.n_categories])
+			*cats, dtype=self.dtype, device=self.device, requires_grad=False)) 
+				for cats in self.n_categories])
 
 		self._initialized = True
 		super()._initialize(d)
@@ -70,8 +71,10 @@ class ConditionalCategorical(ConditionalDistribution):
 		_xw_sum = []
 
 		for n_categories in self.n_categories:
-			_w_sum.append(torch.zeros(*n_categories[:-1], dtype=self.probs[0].dtype, device=self.device))
-			_xw_sum.append(torch.zeros(*n_categories, dtype=self.probs[0].dtype, device=self.device))
+			_w_sum.append(torch.zeros(*n_categories[:-1], 
+				dtype=self.probs[0].dtype, device=self.device))
+			_xw_sum.append(torch.zeros(*n_categories, 
+				dtype=self.probs[0].dtype, device=self.device))
 
 		self._w_sum = BufferList(_w_sum)
 		self._xw_sum = BufferList(_xw_sum)

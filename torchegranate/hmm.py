@@ -26,20 +26,7 @@ _parameter = lambda x: torch.nn.Parameter(x, requires_grad=False)
 
 class Silent(torch.nn.Module):
 	def __init__(self):
-		pass
-
-def _cast_distributions(distributions):
-	if distributions is None:
-		return []
-
-	nodes = []
-	for i, distribution in enumerate(distributions):
-		if isinstance(distribution, Distribution):
-			nodes.append(distribution)
-		else:
-			raise ValueError("Nodes must be node or distribution objects.")
-
-	return nodes
+		super().__init__()
 
 
 def _check_inputs(model, X, priors, emissions):
@@ -52,14 +39,15 @@ def _check_inputs(model, X, priors, emissions):
 	k = X.shape[1] if X is not None else -1
 
 	emissions = _check_parameter(_cast_as_tensor(emissions), "emissions", 
-		ndim=3, shape=(n, k, model.n_nodes))
+		ndim=3, shape=(n, k, model.n_distributions))
 	if emissions is None:
 		emissions = model._emission_matrix(X)
 
 	priors = _check_parameter(_cast_as_tensor(priors), "priors", ndim=3,
-		shape=(n, k, model.n_nodes))
+		shape=(n, k, model.n_distributions))
 	if priors is None:
-		priors = torch.zeros(1, device=model.device).expand_as(emissions)
+		priors = torch.zeros(1, dtype=emissions.dtype, 
+			device=model.device).expand_as(emissions)
 
 	return emissions, priors
 
@@ -160,19 +148,19 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		Whether to print the improvement and timings during training.
 	"""
 
-	def __init__(self, nodes=None, edges=None, starts=None, ends=None, 
+	def __init__(self, distributions=None, edges=None, starts=None, ends=None, 
 		kind="sparse", init='random', max_iter=1000, tol=0.1, 
 		sample_length=None, return_sample_paths=False, inertia=0.0, 
 		frozen=False, random_state=None, verbose=False):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "HiddenMarkovModel"
 
-		_check_parameter(kind, "kind", value_set=('sparse', 'dense'))
+		_check_parameter(kind, "kind", value_set=('sparse', 'dense', 'compressed'))
 
-		self.nodes = _cast_distributions(nodes)
+		self.distributions = distributions
 
-		n = len(nodes) if nodes is not None else None
-		self.n_nodes = n
+		n = len(distributions) if distributions is not None else None
+		self.n_distributions = n
 		self.n_edges = len(edges) if edges is not None else None
 
 		self.edges = _check_parameter(_cast_as_tensor(edges), "edges",
@@ -182,19 +170,19 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.ends = _check_parameter(_cast_as_tensor(ends), "ends",
 			ndim=1, shape=(n,), min_value=0., max_value=1.)
 
-		if self.edges is None and nodes is not None:
-			self.edges = torch.ones(self.n_nodes, self.n_nodes) / self.n_nodes
-		elif self.edges is None and nodes is None:
+		if self.edges is None and distributions is not None:
+			self.edges = torch.ones(self.n_distributions, self.n_distributions) / self.n_distributions
+		elif self.edges is None and distributions is None:
 			self.edges = []
 
 		self.start = Silent()
 		self.end = Silent()
 
-		if self.starts is None and nodes is not None:
-			self.starts = torch.ones(self.n_nodes) / self.n_nodes
+		if self.starts is None and distributions is not None:
+			self.starts = torch.ones(self.n_distributions) / self.n_distributions
 
-		if self.ends is None and nodes is not None:
-			self.ends = torch.ones(self.n_nodes) / self.n_nodes
+		if self.ends is None and distributions is not None:
+			self.ends = torch.ones(self.n_distributions) / self.n_distributions
 
 
 		self.kind = kind
@@ -209,9 +197,13 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		self.random_state = random_state
 		self.verbose = verbose
 
-		self.d = self.nodes[0].d if nodes is not None else None
+		self.d = self.distributions[0].d if distributions is not None else None
 		self._model = None
-		self._initialized = all(n._initialized for n in self.nodes)
+		self._initialized = all(n._initialized for n in self.distributions)
+
+	def to(self, *args):
+		super(HiddenMarkovModel, self).to(*args)
+		self._model.to(*args)
 
 	def bake(self):
 		"""Finalize the model after adding in edges manually.
@@ -223,33 +215,24 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		"""
 
 		if self.kind == 'dense':
-			self._model = _DenseHMM(nodes=self.nodes, edges=self.edges,
-				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, 
+			self._model = _DenseHMM(distributions=self.distributions, 
+				edges=self.edges, start=self.start, end=self.end, 
+				starts=self.starts, ends=self.ends, max_iter=self.max_iter,
 				tol=self.tol, sample_length=self.sample_length, 
 				return_sample_paths=self.return_sample_paths,
 				inertia=self.inertia, random_state=self.random_state, 
 				frozen=self.frozen)
 
 		elif self.kind == 'sparse':
-			self._model = _SparseHMM(nodes=self.nodes, edges=self.edges,
-				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, 
+			self._model = _SparseHMM(distributions=self.distributions, 
+				edges=self.edges, start=self.start, end=self.end, 
+				starts=self.starts, ends=self.ends, max_iter=self.max_iter, 
 				tol=self.tol, sample_length=self.sample_length, 
 				return_sample_paths=self.return_sample_paths,
 				random_state=self.random_state, inertia=self.inertia, 
-				frozen=self.frozen)
+				frozen=self.frozen)		
 
-		elif self.kind == 'compressed':
-			self._model = _CompressedHMM(nodes=self.nodes, edges=self.edges,
-				start=self.start, end=self.end, starts=self.starts, 
-				ends=self.ends, max_iter=self.max_iter, 
-				tol=self.tol, sample_length=self.sample_length, 
-				return_sample_paths=self.return_sample_paths,
-				random_state=self.random_state, inertia=self.inertia, 
-				frozen=self.frozen)			
-
-		self.n_nodes = self._model.n_nodes
+		self.n_distributions = self._model.n_distributions
 		self.n_edges = self._model.n_edges
 
 	def _reset_cache(self):
@@ -262,7 +245,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		"""
 
 		self._model._reset_cache()
-		for node in self.nodes:
+		for node in self.distributions:
 			node._reset_cache()
 
 		if self.kind == 'sparse':
@@ -301,12 +284,12 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			sample_weight = _check_parameter(sample_weight, "sample_weight", 
 				min_value=0., ndim=1, shape=(len(X),)).reshape(-1, 1)
 
-		y_hat = KMeans(self.n_nodes, init=self.init, max_iter=1, 
+		y_hat = KMeans(self.n_distributions, init=self.init, max_iter=1, 
 			random_state=self.random_state).fit_predict(X, 
 			sample_weight=sample_weight)
 
-		for i in range(self.n_nodes):
-			self.nodes[i].fit(X[y_hat == i], 
+		for i in range(self.n_distributions):
+			self.distributions[i].fit(X[y_hat == i], 
 				sample_weight=sample_weight[y_hat == i])
 
 		self._initialized = True
@@ -340,10 +323,10 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		n, k, _ = X.shape
 		X = X.reshape(-1, self.d)
 
-		e = torch.empty((k, self.n_nodes, n), dtype=torch.float32, 
+		e = torch.empty((k, self.n_distributions, n), dtype=self.dtype, 
 			requires_grad=False, device=self.device)
 		
-		for i, node in enumerate(self.nodes):
+		for i, node in enumerate(self.distributions):
 			logp = node.log_probability(X)
 			if isinstance(logp, torch.masked.MaskedTensor):
 				logp = logp._masked_data
@@ -392,7 +375,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			A set of examples to evaluate. Does not need to be passed in if
 			emissions are. 
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -411,7 +394,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		f: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		f: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			The log probabilities calculated by the forward algorithm.
 		"""
 
@@ -441,7 +424,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			A set of examples to evaluate. Does not need to be passed in if
 			emissions are. 
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -460,7 +443,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		b: torch.Tensor, shape=(-1, len, self.n_nodes)
+		b: torch.Tensor, shape=(-1, len, self.n_distributions)
 			The log probabilities calculated by the backward algorithm.
 		"""
 
@@ -494,7 +477,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			A set of examples to evaluate. Does not need to be passed in if
 			emissions are. 
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -513,24 +496,24 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		transitions: torch.Tensor, shape=(-1, n_nodes, n_nodes) or (-1, n_edges)
+		transitions: torch.Tensor, shape=(-1, n_distributions, n_distributions) or (-1, n_edges)
 			The expected number of transitions across each edge that occur
 			for each example. The returned transitions follow the structure
 			of the transition matrix and so will be dense or sparse as
 			appropriate.
 
-		emissions: torch.Tensor, shape=(-1, length, n_nodes)
+		emissions: torch.Tensor, shape=(-1, length, n_distributions)
 			The posterior probabilities of each observation belonging to each
 			state given that one starts at the beginning of the sequence,
 			aligns observations across all paths to get to the current
 			observation, and then proceeds to align all remaining observations
 			until the end of the sequence.
 
-		starts: torch.Tensor, shape=(-1, n_nodes)
+		starts: torch.Tensor, shape=(-1, n_distributions)
 			The probabilities of starting at each node given the 
 			forward-backward algorithm.
 
-		ends: torch.Tensor, shape=(-1, n_nodes)
+		ends: torch.Tensor, shape=(-1, n_distributions)
 			The probabilities of ending at each node given the forward-backward
 			algorithm.
 
@@ -593,7 +576,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -602,7 +585,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		r: torch.Tensor, shape=(-1, len, self.n_nodes)
+		r: torch.Tensor, shape=(-1, len, self.n_distributions)
 			The log posterior probabilities for each example under each 
 			component as calculated by the forward-backward algorithm.
 		"""
@@ -623,7 +606,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -632,7 +615,7 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 
 		Returns
 		-------
-		y: torch.Tensor, shape=(-1, len, self.n_nodes)
+		y: torch.Tensor, shape=(-1, len, self.n_distributions)
 			The posterior probabilities for each example under each component
 			as calculated by the forward-backward algorithm.
 		"""
@@ -764,13 +747,13 @@ class HiddenMarkovModel(GraphMixin, Distribution):
 			A set of weights for the examples. This can be either of shape
 			(-1, length, self.d) or a vector of shape (-1,). Default is ones.
 
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_nodes)
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.
 
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_nodes)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the

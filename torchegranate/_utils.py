@@ -293,7 +293,16 @@ def _reshape_weights(X, sample_weight, device='cpu'):
 	"""
 
 	if sample_weight is None:
-		sample_weight = torch.ones(1, device=device).expand(*X.shape)
+		if torch.is_floating_point(X):
+			sample_weight = torch.ones(1, device=device, 
+				dtype=X.dtype).expand(*X.shape)
+		else:
+			sample_weight = torch.ones(1, device=device, 
+				dtype=torch.float32).expand(*X.shape)
+	else:
+		if not torch.is_floating_point(sample_weight):
+			sample_weight = sample_weight.type(torch.float32)
+
 
 	if len(sample_weight.shape) == 1: 
 		sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[1])
@@ -308,7 +317,8 @@ def _reshape_weights(X, sample_weight, device='cpu'):
 			sample_weight = torch.masked.MaskedTensor(sample_weight, 
 				mask=X._masked_mask)
 
-	_check_parameter(sample_weight, "sample_weight", shape=X.shape, ndim=X.ndim)
+	_check_parameter(sample_weight, "sample_weight", shape=X.shape, 
+		ndim=X.ndim)
 	return sample_weight
 
 

@@ -35,6 +35,10 @@ class Distribution(torch.nn.Module):
 		except:
 			return 'cpu'
 
+	@property
+	def dtype(self):
+		return next(self.parameters()).dtype
+
 	def forward(self, X):
 		self.summarize(X)
 		return self.log_probability(X)
@@ -68,8 +72,8 @@ class Distribution(torch.nn.Module):
 		X = _cast_as_tensor(X)
 		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
 
-		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
-			dtype=torch.float32), device=self.device)
+		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight), 
+			device=self.device)
 
 		return X, sample_weight
 

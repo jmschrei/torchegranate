@@ -90,8 +90,10 @@ class Gamma(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.shapes = _cast_as_parameter(torch.zeros(d, device=self.device))
-		self.rates = _cast_as_parameter(torch.zeros(d, device=self.device))
+		self.shapes = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+			device=self.device))
+		self.rates = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+			device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)

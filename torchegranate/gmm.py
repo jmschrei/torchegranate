@@ -132,8 +132,8 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
 
 		if sample_weight is None:
-			sample_weight = torch.ones(1, device=self.device).expand(
-				X.shape[0], 1)
+			sample_weight = torch.ones(1, dtype=self.dtype, 
+				device=self.device).expand(X.shape[0], 1)
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
 				"sample_weight", min_value=0.)
@@ -147,7 +147,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		y_hat = model.fit_predict(X, sample_weight=sample_weight)
 
 		self.priors = _cast_as_parameter(torch.empty(self.k, 
-			device=self.device))
+			dtype=self.dtype, device=self.device))
 
 		for i in range(self.k):
 			idx = y_hat == i

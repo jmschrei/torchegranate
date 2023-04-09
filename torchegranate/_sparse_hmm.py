@@ -19,10 +19,10 @@ from ._base import GraphMixin
 NEGINF = float("-inf")
 inf = float("inf")
 
-def _convert_to_sparse_edges(nodes, edges, starts, ends, start, end):
-	n = len(nodes)
+def _convert_to_sparse_edges(distributions, edges, starts, ends, start, end):
+	n = len(distributions)
 
-	if len(edges[0]) == 3 and len(nodes) != 3:
+	if len(edges[0]) == 3 and len(distributions) != 3:
 		_edges = edges
 	else:
 		n = len(edges)
@@ -31,17 +31,17 @@ def _convert_to_sparse_edges(nodes, edges, starts, ends, start, end):
 		for i in range(n):
 			for j in range(n):
 				if edges[i, j] != 0:
-					_edges.append((nodes[i], nodes[j], edges[i, j])) 
+					_edges.append((distributions[i], distributions[j], edges[i, j])) 
 
 	if starts is not None:
 		for i in range(n):
 			if starts[i] != 0:
-				_edges.append((start, nodes[i], starts[i]))
+				_edges.append((start, distributions[i], starts[i]))
 
 	if ends is not None:
 		for i in range(n):
 			if ends[i] != 0:
-				_edges.append((nodes[i], end, ends[i]))
+				_edges.append((distributions[i], end, ends[i]))
 
 	return _edges
 
@@ -61,7 +61,7 @@ class _SparseHMM(Distribution):
 	first is by passing in a set of distributions, a dense transition matrix, 
 	and optionally start/end probabilities. The second is to initialize the
 	object without these and then to add edges using the `add_edge` method
-	and to add nodes using the `add_nodes` method. Importantly, the way that
+	and to add distributions using the `add_distributions` method. Importantly, the way that
 	you choose to initialize the hidden Markov model is independent of the
 	implementation that you end up choosing. If you pass in a dense transition
 	matrix, this will be converted to a sparse matrix with all the zeros
@@ -102,17 +102,17 @@ class _SparseHMM(Distribution):
 		parameter directly. Default is False.
 	"""
 
-	def __init__(self, nodes, edges, start, end, starts=None, ends=None, max_iter=10, 
+	def __init__(self, distributions, edges, start, end, starts=None, ends=None, max_iter=10, 
 		tol=0.1, sample_length=None, return_sample_paths=False, inertia=0.0, 
 		frozen=False, random_state=None):
 		super().__init__(inertia=inertia, frozen=frozen)
 		self.name = "_SparseHMM"
 
-		self.nodes = nodes
-		self.edges = _convert_to_sparse_edges(nodes, edges, starts, ends,
+		self.distributions = distributions
+		self.edges = _convert_to_sparse_edges(distributions, edges, starts, ends,
 			start, end)
 
-		self.n_nodes = len(self.nodes)
+		self.n_distributions = len(self.distributions)
 		self.n_edges = len(self.edges)
 
 		self.sample_length = sample_length
@@ -123,8 +123,8 @@ class _SparseHMM(Distribution):
 		else:
 			self.random_state = random_state
 
-		self.starts = _cast_as_parameter(torch.full((self.n_nodes,), -inf))
-		self.ends = _cast_as_parameter(torch.full((self.n_nodes,), -inf))
+		self.starts = _cast_as_parameter(torch.full((self.n_distributions,), -inf))
+		self.ends = _cast_as_parameter(torch.full((self.n_distributions,), -inf))
 
 		_edge_idx_starts = _cast_as_parameter(torch.empty(self.n_edges, 
 			dtype=torch.int64))
@@ -136,16 +136,16 @@ class _SparseHMM(Distribution):
 		idx = 0
 		for ni, nj, probability in self.edges:
 			if ni is start:
-				j = self.nodes.index(nj)
+				j = self.distributions.index(nj)
 				self.starts[j] = math.log(probability)
 
 			elif nj is end:
-				i = self.nodes.index(ni)
+				i = self.distributions.index(ni)
 				self.ends[i] = math.log(probability)
 
 			else:
-				i = self.nodes.index(ni)
-				j = self.nodes.index(nj)
+				i = self.distributions.index(ni)
+				j = self.distributions.index(nj)
 
 				_edge_idx_starts[idx] = i
 				_edge_idx_ends[idx] = j
@@ -153,11 +153,11 @@ class _SparseHMM(Distribution):
 				idx += 1
 
 		if torch.isinf(self.starts).sum() == len(self.starts):
-			self.starts = torch.ones(self.n_nodes) / self.n_nodes
+			self.starts = torch.ones(self.n_distributions) / self.n_distributions
 		if torch.isinf(self.ends).sum() == len(self.ends):
-			self.ends = torch.ones(self.n_nodes) / self.n_nodes
+			self.ends = torch.ones(self.n_distributions) / self.n_distributions
 
-		self.nodes = torch.nn.ModuleList(self.nodes)
+		self.distributions = torch.nn.ModuleList(self.distributions)
 
 		self._edge_idx_starts = _cast_as_parameter(_edge_idx_starts[:idx])
 		self._edge_idx_ends = _cast_as_parameter(_edge_idx_ends[:idx])
@@ -182,13 +182,13 @@ class _SparseHMM(Distribution):
 		"""
 
 		self.register_buffer("_xw_sum", torch.zeros(self.n_edges, 
-			dtype=torch.float32, device=self.device))
+			dtype=self.dtype, device=self.device))
 
-		self.register_buffer("_xw_starts_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float32, device=self.device))
+		self.register_buffer("_xw_starts_sum", torch.zeros(
+			self.n_distributions, dtype=self.dtype, device=self.device))
 
-		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_nodes, 
-			dtype=torch.float32, device=self.device))
+		self.register_buffer("_xw_ends_sum", torch.zeros(
+			self.n_distributions, dtype=self.dtype, device=self.device))
 
 	def sample(self, n):
 		"""Sample from the probability distribution.
@@ -216,13 +216,13 @@ class _SparseHMM(Distribution):
 			raise ValueError("Must specify a length or have explicit "
 				+ "end probabilities.")
 
-		nodes, emissions = [], []
+		distributions, emissions = [], []
 		edge_ends, edge_probs = [], []
-		for idx in range(self.n_nodes):
+		for idx in range(self.n_distributions):
 			idxs = self._edge_idx_starts == idx
 
 			_ends = numpy.concatenate([self._edge_idx_ends[idxs].numpy(), 
-				[self.n_nodes]])
+				[self.n_distributions]])
 			_probs = numpy.concatenate([torch.exp(self._edge_log_probs[idxs]
 				).numpy(), [numpy.exp(self.ends[idx])]])
 
@@ -232,25 +232,25 @@ class _SparseHMM(Distribution):
 		starts = torch.exp(self.starts).numpy()
 
 		for _ in range(n):	
-			node_i = self.random_state.choice(self.n_nodes, p=starts)
-			emission_i = self.nodes[node_i].sample(n=1)
-			nodes_, emissions_ = [node_i], [emission_i]
+			node_i = self.random_state.choice(self.n_distributions, p=starts)
+			emission_i = self.distributions[node_i].sample(n=1)
+			distributions_, emissions_ = [node_i], [emission_i]
 
 			for i in range(1, self.sample_length or int(1e8)):
 				node_i = self.random_state.choice(edge_ends[node_i], p=edge_probs[node_i])
-				if node_i == self.n_nodes:
+				if node_i == self.n_distributions:
 					break
 
-				emission_i = self.nodes[node_i].sample(n=1)
+				emission_i = self.distributions[node_i].sample(n=1)
 
-				nodes_.append(node_i)
+				distributions_.append(node_i)
 				emissions_.append(emission_i)
 
-			nodes.append(nodes_)
+			distributions.append(distributions_)
 			emissions.append(torch.vstack(emissions_))
 
 		if self.return_sample_paths == True:
-			return emissions, nodes
+			return emissions, distributions
 		return emissions
 
 
@@ -271,13 +271,13 @@ class _SparseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call. 		
 
-		priors: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		priors: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -286,13 +286,13 @@ class _SparseHMM(Distribution):
 
 		Returns
 		-------
-		f: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		f: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			The log probabilities calculated by the forward algorithm.
 		"""
 
 		n, l, _ = emissions.shape
 
-		f = torch.full((l, n, self.n_nodes), -inf, dtype=torch.float32, 
+		f = torch.full((l, n, self.n_distributions), -inf, dtype=torch.float32, 
 			device=self.device)
 		f[0] = self.starts + emissions[:, 0] + priors[:, 0]
 
@@ -329,13 +329,13 @@ class _SparseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, l, self.n_nodes)
+		emissions: torch.Tensor, shape=(-1, l, self.n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.
 
-		priors: torch.Tensor, shape=(-1, l, self.n_nodes)
+		priors: torch.Tensor, shape=(-1, l, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -344,13 +344,13 @@ class _SparseHMM(Distribution):
 
 		Returns
 		-------
-		b: torch.Tensor, shape=(-1, length, self.n_nodes)
+		b: torch.Tensor, shape=(-1, length, self.n_distributions)
 			The log probabilities calculated by the backward algorithm.
 		"""
 
 		n, l, _ = emissions.shape
 
-		b = torch.full((l, n, self.n_nodes), -inf, dtype=torch.float32,
+		b = torch.full((l, n, self.n_distributions), -inf, dtype=torch.float32,
 			device=self.device)
 		b[-1] = self.ends
 
@@ -387,13 +387,13 @@ class _SparseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.	
 
-		priors: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		priors: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
@@ -402,24 +402,24 @@ class _SparseHMM(Distribution):
 
 		Returns
 		-------
-		transitions: torch.Tensor, shape=(-1, self.n_nodes, self.n_nodes)
+		transitions: torch.Tensor, shape=(-1, self.n_distributions, self.n_distributions)
 			The expected number of transitions across each edge that occur
 			for each example. The returned transitions follow the structure
 			of the transition matrix and so will be dense or sparse as
 			appropriate.
 
-		responsibility: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		responsibility: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			The posterior probabilities of each observation belonging to each
 			state given that one starts at the beginning of the sequence,
 			aligns observations across all paths to get to the current
 			observation, and then proceeds to align all remaining observations
 			until the end of the sequence.
 
-		starts: torch.Tensor, shape=(-1, self.n_nodes)
+		starts: torch.Tensor, shape=(-1, self.n_distributions)
 			The probabilities of starting at each node given the 
 			forward-backward algorithm.
 
-		ends: torch.Tensor, shape=(-1, self.n_nodes)
+		ends: torch.Tensor, shape=(-1, self.n_distributions)
 			The probabilities of ending at each node given the forward-backward
 			algorithm.
 
@@ -470,19 +470,19 @@ class _SparseHMM(Distribution):
 		"""
 
 		y = _check_parameter(_cast_as_tensor(y), "y", ndim=2, min_value=0, 
-			max_value=self.n_nodes-1, dtypes=(torch.int32, torch.int64),
+			max_value=self.n_distributions-1, dtypes=(torch.int32, torch.int64),
 			shape=(X.shape[0], X.shape[1]))
 
 		n, l, d = X.shape
 
-		starts = torch.zeros(n, self.n_nodes, device=self.device)
+		starts = torch.zeros(n, self.n_distributions, device=self.device)
 		starts[torch.arange(n), y[:, 0]] = 1 
 
 		ends = torch.zeros_like(starts)
 		ends[torch.arange(n), y[:, -1]] = 1
 
 		t = torch.zeros((n, self.n_edges), device=self.device)
-		r = torch.zeros(n, l, self.n_nodes, device=self.device) - inf
+		r = torch.zeros(n, l, self.n_distributions, device=self.device) - inf
 
 		for i in range(n):
 			for j in range(l-1):
@@ -529,7 +529,7 @@ class _SparseHMM(Distribution):
 			(-1, self.d) or a vector of shape (-1,). Default is ones.
 
 
-		emissions: torch.Tensor, shape=(-1, -1, self.n_nodes)
+		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
@@ -554,7 +554,7 @@ class _SparseHMM(Distribution):
 
 		X = X.reshape(-1, X.shape[-1])
 		r = torch.exp(r) * sample_weight.unsqueeze(1)
-		for i, node in enumerate(self.nodes):
+		for i, node in enumerate(self.distributions):
 			w = r[:, :, i].reshape(-1, 1)
 			node.summarize(X, sample_weight=w)
 
@@ -571,7 +571,7 @@ class _SparseHMM(Distribution):
 		`summarize` method followed by the `from_summaries` method.
 		"""
 
-		for node in self.nodes:
+		for node in self.distributions:
 			node.from_summaries()
 
 		if self.frozen:

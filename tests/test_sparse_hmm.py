@@ -72,7 +72,7 @@ def model():
 	         [0.3, 0.6]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
+	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, ends=ends,
 		kind='sparse', random_state=0)
 	model.bake()
 	return model
@@ -88,7 +88,7 @@ def test_initialization():
 	assert model.frozen == False
 	assert model.kind == 'sparse'
 
-	assert model.n_nodes == 2
+	assert model.n_distributions == 2
 
 	assert_array_almost_equal(model.ends, torch.ones(2) / 2.0)
 	assert_array_almost_equal(model.starts, torch.ones(2) / 2.0)
@@ -160,11 +160,11 @@ def test_initialize(X):
 	d = [Exponential(), Exponential()]
 	model = HiddenMarkovModel(d, random_state=0)
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert model.d is None
-	assert model.n_nodes == 2
+	assert model.n_distributions == 2
 	assert model._initialized == False
 	assert model._model is None
 
@@ -236,7 +236,7 @@ def test_sample_length(model):
 	         [0.3, 0.6]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
+	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, ends=ends,
 		kind='sparse', sample_length=3, random_state=0)
 	model.bake()
 
@@ -254,7 +254,7 @@ def test_sample_paths(model):
 	         [0.6, 0.3]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=edges, starts=starts, ends=ends,
+	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, ends=ends,
 		kind='sparse', return_sample_paths=True, random_state=0)
 	model.bake()
 
@@ -533,8 +533,8 @@ def test_predict_log_proba_raises(model, X):
 
 
 def test_partial_summarize(model, X):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 	model.summarize(X[:1])
 
 	assert_array_almost_equal(model._model._xw_sum,
@@ -562,8 +562,8 @@ def test_partial_summarize(model, X):
 
 
 def test_summarize(model, X):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 	model.summarize(X)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -579,8 +579,8 @@ def test_summarize(model, X):
 
 
 def test_summarize_weighted(model, X, w):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 	model.summarize(X, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -611,8 +611,8 @@ def test_summarize_raises(model, X, w):
 
 
 def test_from_summaries(model, X):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -632,8 +632,8 @@ def test_from_summaries(model, X):
 
 
 def test_from_summaries_weighted(model, X, w):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -655,12 +655,12 @@ def test_from_summaries_weighted(model, X, w):
 
 def test_from_summaries_inertia(X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', inertia=0.3)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -681,12 +681,12 @@ def test_from_summaries_inertia(X):
 
 	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -707,12 +707,12 @@ def test_from_summaries_inertia(X):
 
 def test_from_summaries_weighted_inertia(X, w):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', inertia=0.3)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -734,12 +734,12 @@ def test_from_summaries_weighted_inertia(X, w):
 
 	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
@@ -760,12 +760,12 @@ def test_from_summaries_weighted_inertia(X, w):
 
 def test_from_summaries_frozen(model, X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', frozen=True)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -786,12 +786,12 @@ def test_from_summaries_frozen(model, X):
 
 	d = [Exponential([2.1, 0.3, 0.1], frozen=True), 
 	     Exponential([1.5, 3.1, 2.2], frozen=True)]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', inertia=0.0)
 	model.bake()
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X)
 	model.from_summaries()
@@ -814,13 +814,13 @@ def test_fit(X):
 	X = torch.tensor(numpy.array(X) + 1)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=1)
 	model.bake()
 	model.fit(X)
 	
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-1.489857e+01, -3.385568e-07], 4)
 	assert_array_almost_equal(model.ends, [-1.110725, -1.609444])
@@ -836,14 +836,14 @@ def test_fit(X):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
 	model.bake()
 	model.fit(X)
 
 	
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -863,13 +863,13 @@ def test_fit_weighted(X, w):
 	X = torch.tensor(numpy.array(X) + 1)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=1)
 	model.bake()
 	model.fit(X, sample_weight=w)
 	
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-1.5399e+01, -2.0519e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.732272, -1.609437])
@@ -885,14 +885,14 @@ def test_fit_weighted(X, w):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
 	model.bake()
 	model.fit(X, sample_weight=w)
 
 	
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-1.6093e+01, -1.0250e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.469704, -1.609439])
@@ -1177,8 +1177,8 @@ def test_masked_ones_summarize(model, X, w):
 	mask = torch.ones_like(X).type(torch.bool)
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 	model.summarize(X_, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -1195,8 +1195,8 @@ def test_masked_ones_summarize(model, X, w):
 
 
 def test_masked_summarize(model, X, X_masked, w):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 	model.summarize(X_masked, sample_weight=w)
 
 	assert_array_almost_equal(model._model._xw_sum, 
@@ -1217,8 +1217,8 @@ def test_masked_ones_from_summaries(model, X, w):
 	mask = torch.ones_like(X).type(torch.bool)
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X_, sample_weight=w)
 	model.from_summaries()
@@ -1239,8 +1239,8 @@ def test_masked_ones_from_summaries(model, X, w):
 
 
 def test_masked_from_summaries(model, X_masked, w):
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	model.summarize(X_masked, sample_weight=w)
 	model.from_summaries()
@@ -1266,14 +1266,14 @@ def test_masked_fit(X, X_masked):
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
 	model.bake()
 	model.fit(X_)
 
 	
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -1290,13 +1290,13 @@ def test_masked_fit(X, X_masked):
 
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(nodes=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='sparse', max_iter=5)
 	model.bake()
 	model.fit(X_masked + 1)
 
-	d1 = model.nodes[0]
-	d2 = model.nodes[1]
+	d1 = model.distributions[0]
+	d2 = model.distributions[1]
 
 	assert_array_almost_equal(model.starts, [-16.6664,   0.0000], 4)
 	assert_array_almost_equal(model.ends, [-0.9247, -1.7014], 4)

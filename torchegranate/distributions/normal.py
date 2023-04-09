@@ -107,11 +107,13 @@ class Normal(Distribution):
 		
 		if self.covariance_type == 'full':
 			self.covs = _cast_as_parameter(torch.zeros(d, d, 
-				device=self.device))
+				dtype=self.dtype, device=self.device))
 		elif self.covariance_type == 'diag':
-			self.covs = _cast_as_parameter(torch.zeros(d, device=self.device))
+			self.covs = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+				device=self.device))
 		elif self.covariance_type == 'sphere':
-			self.covs = _cast_as_parameter(torch.tensor(0, device=self.device))
+			self.covs = _cast_as_parameter(torch.tensor(0, dtype=self.dtype,
+				device=self.device))
 
 		self._initialized = True
 		super()._initialize(d)
@@ -159,6 +161,8 @@ class Normal(Distribution):
 
 				self.register_buffer("_log_sigma_sqrt_2pi", _log_sigma_sqrt_2pi)
 				self.register_buffer("_inv_two_sigma", _inv_two_sigma)
+			else:
+				raise ValueError("Variances must be positive.")
 
 	def sample(self, n):
 		"""Sample from the probability distribution.
