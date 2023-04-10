@@ -226,6 +226,12 @@ class _BaseHMM(Distribution):
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
 			(-1, len) or a vector of shape (-1,). Default is ones.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
@@ -289,201 +295,6 @@ class _BaseHMM(Distribution):
 			e[:, i] = logp.reshape(n, k).T
 
 		return e.permute(2, 0, 1)
-
-	def sample(self, n):
-		"""Sample from the probability distribution.
-
-		This method will return `n` samples generated from the underlying
-		probability distribution. Because a HMM describes variable length
-		sequences, a list will be returned where each element is one of
-		the generated sequences.
-
-
-		Parameters
-		----------
-		n: int
-			The number of samples to generate.
-		
-
-		Returns
-		-------
-		X: list of torch.tensor, shape=(n,)
-			A list of randomly generated samples, where each sample of
-			size (length, self.d).
-		"""
-
-		return self.sample(n=n)
-
-	def forward(self, X=None, emissions=None, priors=None, check_inputs=True):
-		"""Run the forward algorithm on some data.
-
-		Runs the forward algorithm on a batch of sequences. This is not to be
-		confused with a "forward pass" when talking about neural networks. The
-		forward algorithm is a dynamic programming algorithm that begins at the
-		start state and returns the probability, over all paths through the
-		model, that result in the alignment of symbol i to node j.
-
-		
-		Parameters
-		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
-			A set of examples to evaluate. Does not need to be passed in if
-			emissions are. 
-
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
-
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
-
-		check_inputs: bool, optional
-			Whether to check the shape of the inputs and calculate emission
-			matrices. Default is True.
-
-
-		Returns
-		-------
-		f: torch.Tensor, shape=(-1, -1, self.n_distributions)
-			The log probabilities calculated by the forward algorithm.
-		"""
-
-		if check_inputs:
-			emissions, priors = _check_inputs(self, X, emissions, priors) 
-		else:
-			if X is None:
-				raise ValueError("Must check inputs if not passing in "
-					"a pre-calculated emission matrix.")
-
-		return emissions, priors
-
-	def backward(self, X=None, emissions=None, priors=None, check_inputs=True):
-		"""Run the backward algorithm on some data.
-
-		Runs the backward algorithm on a batch of sequences. This is not to be
-		confused with a "backward pass" when talking about neural networks. The
-		backward algorithm is a dynamic programming algorithm that begins at end
-		of the sequence and returns the probability, over all paths through the
-		model, that result in the alignment of symbol i to node j, working
-		backwards.
-
-		
-		Parameters
-		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, d)
-			A set of examples to evaluate. Does not need to be passed in if
-			emissions are. 
-
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, len, n_distributions)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
-
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, d)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
-
-		check_inputs: bool, optional
-			Whether to check the shape of the inputs and calculate emission
-			matrices. Default is True.
-
-
-		Returns
-		-------
-		b: torch.Tensor, shape=(-1, len, self.n_distributions)
-			The log probabilities calculated by the backward algorithm.
-		"""
-
-		if check_inputs:
-			emissions, priors = _check_inputs(self, X, emissions, priors) 
-		else:
-			if X is None:
-				raise ValueError("Must check inputs if not passing in "
-					"a pre-calculated emission matrix.")
-
-		return emissions, priors
-
-	def forward_backward(self, X=None, emissions=None, priors=None, 
-		check_inputs=True):
-		"""Run the forward-backward algorithm on some data.
-
-		Runs the forward-backward algorithm on a batch of sequences. This
-		algorithm combines the best of the forward and the backward algorithm.
-		It combines the probability of starting at the beginning of the sequence
-		and working your way to each observation with the probability of
-		starting at the end of the sequence and working your way backward to it.
-
-		A number of statistics can be calculated using this information. These
-		statistics are powerful inference tools but are also used during the
-		Baum-Welch training process. 
-
-		
-		Parameters
-		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
-			A set of examples to evaluate. Does not need to be passed in if
-			emissions are. 
-
-		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.
-
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
-
-		check_inputs: bool, optional
-			Whether to check the shape of the inputs and calculate emission
-			matrices. Default is True.
-
-
-		Returns
-		-------
-		transitions: torch.Tensor, shape=(-1, n_distributions, n_distributions) or (-1, n_edges)
-			The expected number of transitions across each edge that occur
-			for each example. The returned transitions follow the structure
-			of the transition matrix and so will be dense or sparse as
-			appropriate.
-
-		emissions: torch.Tensor, shape=(-1, length, n_distributions)
-			The posterior probabilities of each observation belonging to each
-			state given that one starts at the beginning of the sequence,
-			aligns observations across all paths to get to the current
-			observation, and then proceeds to align all remaining observations
-			until the end of the sequence.
-
-		starts: torch.Tensor, shape=(-1, n_distributions)
-			The probabilities of starting at each node given the 
-			forward-backward algorithm.
-
-		ends: torch.Tensor, shape=(-1, n_distributions)
-			The probabilities of ending at each node given the forward-backward
-			algorithm.
-
-		logp: torch.Tensor, shape=(-1,)
-			The log probabilities of each sequence given the model.
-		"""
-
-		if check_inputs:
-			emissions, priors = _check_inputs(self, X, emissions, priors) 
-		else:
-			if X is None:
-				raise ValueError("Must check inputs if not passing in "
-					"a pre-calculated emission matrix.")
-
-		return emissions, priors
 
 	def log_probability(self, X, priors=None, check_inputs=True):
 		"""Calculate the log probability of each example.
@@ -606,7 +417,7 @@ class _BaseHMM(Distribution):
 
 		return torch.argmax(self.predict_log_proba(X, priors=priors), dim=-1)
 
-	def fit(self, X, y=None, sample_weight=None, priors=None):
+	def fit(self, X, sample_weight=None, priors=None):
 		"""Fit the model to optionally weighted examples.
 
 		This method implements the core of the learning process. For a hidden
@@ -647,7 +458,8 @@ class _BaseHMM(Distribution):
 		logp, last_logp = None, None
 		for i in range(self.max_iter):
 			start_time = time.time()
-			logp = self.summarize(X, y=y, sample_weight=sample_weight).sum()
+			logp = self.summarize(X, sample_weight=sample_weight, 
+				priors=priors).sum()
 
 			if i > 0:
 				improvement = logp - last_logp
@@ -665,7 +477,8 @@ class _BaseHMM(Distribution):
 			self.from_summaries()
 
 		if self.verbose:
-			logp = self.summarize(X, y=y, sample_weight=sample_weight).sum()
+			logp = self.summarize(X, sample_weight=sample_weight, 
+				priors=priors).sum()
 
 			improvement = logp - last_logp
 			duration = time.time() - start_time
@@ -676,7 +489,7 @@ class _BaseHMM(Distribution):
 		self._reset_cache()
 		return self
 
-	def summarize(self, X, y=None, sample_weight=None, emissions=None, 
+	def summarize(self, X, sample_weight=None, emissions=None, 
 		priors=None):
 		"""Extract the sufficient statistics from a batch of data.
 
@@ -691,12 +504,6 @@ class _BaseHMM(Distribution):
 		----------
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to summarize.
-
-		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len), optional 
-			A set of labels with the same number of examples and length as the
-			observations that indicate which node in the model that each
-			observation should be assigned to. Passing this in means that the
-			model uses labeled training instead of Baum-Welch. Default is None.
 
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape

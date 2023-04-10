@@ -13,6 +13,7 @@ from ._utils import _check_parameter
 from .distributions._distribution import Distribution
 
 from ._base import _BaseHMM
+from ._base import _check_inputs
 
 
 NEGINF = float("-inf")
@@ -268,8 +269,7 @@ class DenseHMM(_BaseHMM):
 			The log probabilities calculated by the forward algorithm.
 		"""
 
-		emissions, priors = super().forward(X=X, emissions=emissions, 
-			priors=priors, check_inputs=check_inputs)
+		emissions, priors = _check_inputs(self, X, emissions, priors)
 
 		l = emissions.shape[1]
 
@@ -331,12 +331,11 @@ class DenseHMM(_BaseHMM):
 			The log probabilities calculated by the backward algorithm.
 		"""
 
-		emissions, priors = super().backward(X=X, emissions=emissions, 
-			priors=priors, check_inputs=check_inputs)
+		emissions, priors = _check_inputs(self, X, emissions, priors)
 
 		n, l, _ = emissions.shape
 
-		b = torch.zeros(l, n, self.n_distributions, dtype=torch.float32, 
+		b = torch.zeros(l, n, self.n_distributions, dtype=self.dtype, 
 			device=self.device) + float("-inf")
 		b[-1] = self.ends
 
@@ -418,8 +417,7 @@ class DenseHMM(_BaseHMM):
 			The log probabilities of each sequence given the model.
 		"""
 
-		emissions, priors = super().forward_backward(X=X, emissions=emissions,
-			priors=priors, check_inputs=check_inputs)
+		emissions, priors = _check_inputs(self, X, emissions, priors)
 
 		n, l, _ = emissions.shape
 
@@ -446,61 +444,7 @@ class DenseHMM(_BaseHMM):
 		r = r - torch.logsumexp(r, dim=2).reshape(n, -1, 1)
 		return t, r, starts, ends, logp
 
-	def _labeled_summarize(self, X, y):
-		"""Extract sufficient statistics given a set of labels.
-
-		This method calculates the sufficient statistics from data where the
-		observations have labels. This amounts to essentially counting the
-		number of times that each transition occurs and creating a sparse
-		update matrix.
-
-		
-		Parameters
-		----------
-		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
-			Precalculated emission log probabilities. These are the
-			probabilities of each observation under each probability 
-			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.	
-
-		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
-			A set of labels with the same shape as the observations that
-			indicate which node each observation came from. Passing this in
-			means that the model uses labeled learning instead of Baum-Welch.
-			Default is None.
-		"""
-
-		y = _check_parameter(_cast_as_tensor(y), "y", ndim=2, min_value=0, 
-			max_value=self.n_distributions-1, dtypes=(torch.int32, torch.int64),
-			shape=(X.shape[0], X.shape[1]))
-
-		n, l, d = X.shape
-
-		starts = torch.zeros(n, self.n_distributions, device=self.device)
-		starts[torch.arange(n), y[:, 0]] = 1 
-
-		ends = torch.zeros_like(starts)
-		ends[torch.arange(n), y[:, -1]] = 1
-
-		t = torch.zeros((n, self.n_distributions, self.n_distributions), 
-			device=self.device)
-		r = torch.zeros(n, l, self.n_distributions, device=self.device) - inf
-
-		for i in range(n):
-			for j in range(l-1):
-				t[i][y[i, j], y[i, j+1]] += 1
-				r[i, j, y[i, j]] = 0
-
-			r[i, l-1, y[i, l-1]] = 0
-
-		if self._initialized:
-			logps = self.log_probability(X)
-		else:
-			logps = torch.zeros(n, device=self.device)
-
-		return t, r, starts, ends, logps
-
-	def summarize(self, X, y=None, sample_weight=None, emissions=None, 
+	def summarize(self, X, sample_weight=None, emissions=None, 
 		priors=None, check_inputs=True):
 		"""Extract the sufficient statistics from a batch of data.
 
@@ -542,12 +486,8 @@ class DenseHMM(_BaseHMM):
 		X, emissions, priors, sample_weight = super().summarize(X, 
 			sample_weight=sample_weight, emissions=emissions, priors=priors)
 
-		if y is None:
-			t, r, starts, ends, logps = self.forward_backward(
-				emissions=emissions, priors=priors, check_inputs=check_inputs)
-		else:
-			t, r, starts, ends, logps = self._labeled_summarize(
-				emissions=emissions, y=y)
+		t, r, starts, ends, logps = self.forward_backward(
+			emissions=emissions, priors=priors, check_inputs=check_inputs)
 
 		self._xw_starts_sum += torch.sum(starts * sample_weight, dim=0)
 		self._xw_ends_sum += torch.sum(ends * sample_weight, dim=0)
