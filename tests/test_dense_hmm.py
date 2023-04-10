@@ -5,8 +5,7 @@ import numpy
 import torch
 import pytest
 
-from torchegranate.hmm import HiddenMarkovModel
-from torchegranate._dense_hmm import _DenseHMM
+from torchegranate.dense_hmm import DenseHMM
 from torchegranate.distributions import Exponential
 
 from .distributions._utils import _test_initialization_raises_one_parameter
@@ -72,9 +71,9 @@ def model():
 	         [0.3, 0.6]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, 
-		ends=ends, kind='dense', random_state=0)
-	model.bake()
+	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends, 
+		random_state=0)
+	#model.bake()
 	return model
 
 ###
@@ -82,100 +81,77 @@ def model():
 
 def test_initialization():
 	d = [Exponential(), Exponential()]
-	model = HiddenMarkovModel(d, kind='dense')
+	model = DenseHMM(d)
 
 	assert model.inertia == 0.0
 	assert model.frozen == False
-	assert model.kind == 'dense'
-
 	assert model.n_distributions == 2
 
-	assert_array_almost_equal(model.ends, torch.ones(2) / 2.0)
-	assert_array_almost_equal(model.starts, torch.ones(2) / 2.0)
-	assert_array_almost_equal(model.edges, torch.ones(2, 2) / 2.0)
+	assert_array_almost_equal(model.ends, numpy.log([0.5, 0.5]))
+	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
+	assert_array_almost_equal(model.edges, numpy.log([[0.5, 0.5], [0.5, 0.5]]))
 
-	assert_raises(AttributeError, getattr, model._model, "_xw_sum")
-	assert_raises(AttributeError, getattr, model._model, "_xw_starts_sum")
-	assert_raises(AttributeError, getattr, model._model, "_xw_ends_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
-	model.bake()
-	assert isinstance(model._model, _DenseHMM)
+	assert isinstance(model, DenseHMM)
 
 
 def test_initialization_raises():
 	d = [Exponential(), Exponential()]
 
-	assert_raises(ValueError, HiddenMarkovModel, d, edges=[0.2, 0.2, 0.6],
-		kind='dense')
-	assert_raises(ValueError, HiddenMarkovModel, d, edges=[0.2, 1.0],
-		kind='dense')
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', 
-		edges=[[-0.2, 0.9], [0.2, 0.8]])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		edges=[[0.3, 1.1], [0.2, 0.8]])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		edges=[[0.2, 0.6, 0.2], [0.2, 0.7, 0.1], [0.1, 0.3, 0.6]])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		edges=[[[0.2, 0.8], [0.2, 0.8]]])
+	assert_raises(ValueError, DenseHMM, d, edges=[0.2, 0.2, 0.6])
+	assert_raises(ValueError, DenseHMM, d, edges=[0.2, 1.0])
+	assert_raises(ValueError, DenseHMM, d, edges=[[-0.2, 0.9], [0.2, 0.8]])
+	assert_raises(ValueError, DenseHMM, d, edges=[[0.3, 1.1], [0.2, 0.8]])
+	assert_raises(ValueError, DenseHMM, d, edges=[[0.2, 0.6, 0.2], 
+		[0.2, 0.7, 0.1], [0.1, 0.3, 0.6]])
+	assert_raises(ValueError, DenseHMM, d, edges=[[[0.2, 0.8], [0.2, 0.8]]])
 
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[0.1, 0.3])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[0.1, 1.2])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[-0.1, 1.1])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[0.5, 0.6])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[0.1, 0.3, 0.3, 0.3])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[[0.1, 0.9]])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		starts=[[0.1], [0.9]])
+	assert_raises(ValueError, DenseHMM, d, starts=[0.1, 0.3])
+	assert_raises(ValueError, DenseHMM, d, starts=[0.1, 1.2])
+	assert_raises(ValueError, DenseHMM, d, starts=[-0.1, 1.1])
+	assert_raises(ValueError, DenseHMM, d, starts=[0.5, 0.6])
+	assert_raises(ValueError, DenseHMM, d, starts=[0.1, 0.3, 0.3, 0.3])
+	assert_raises(ValueError, DenseHMM, d, starts=[[0.1, 0.9]])
+	assert_raises(ValueError, DenseHMM, d, starts=[[0.1], [0.9]])
 
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		ends=[0.1, 1.2])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		ends=[-0.1, 1.1])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		ends=[0.1, 0.3, 0.3, 0.3])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		ends=[[0.1, 0.9]])
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense',
-		ends=[[0.1], [0.9]])
+	assert_raises(ValueError, DenseHMM, d, ends=[0.1, 1.2])
+	assert_raises(ValueError, DenseHMM, d, ends=[-0.1, 1.1])
+	assert_raises(ValueError, DenseHMM, d, ends=[0.1, 0.3, 0.3, 0.3])
+	assert_raises(ValueError, DenseHMM, d, ends=[[0.1, 0.9]])
+	assert_raises(ValueError, DenseHMM, d, ends=[[0.1], [0.9]])
 
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', max_iter=0)
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', max_iter=-1)
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', max_iter=1.3)
+	assert_raises(ValueError, DenseHMM, d, max_iter=0)
+	assert_raises(ValueError, DenseHMM, d, max_iter=-1)
+	assert_raises(ValueError, DenseHMM, d, max_iter=1.3)
 	
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', tol=-1)
+	assert_raises(ValueError, DenseHMM, d, tol=-1)
 
-	assert_raises((ValueError, TypeError), HiddenMarkovModel, Exponential,
-		kind='dense')
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', inertia=-0.4)
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', inertia=1.2)
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', inertia=1.2, 
-		frozen="true")
-	assert_raises(ValueError, HiddenMarkovModel, d, kind='dense', inertia=1.2, 
-		frozen=3)
+	assert_raises((ValueError, TypeError), DenseHMM, Exponential)
+	assert_raises(ValueError, DenseHMM, d, inertia=-0.4)
+	assert_raises(ValueError, DenseHMM, d, inertia=1.2)
+	assert_raises(ValueError, DenseHMM, d, inertia=1.2, frozen="true")
+	assert_raises(ValueError, DenseHMM, d, inertia=1.2, frozen=3)
 	
 
 def test_reset_cache(model, X):
 	model.summarize(X)
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[2.666838e-04, 1.895245e+00], [2.635103e+00, 3.469387e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
 	model._reset_cache()
-	assert_array_almost_equal(model._model._xw_sum, [[0., 0.], [0., 0.]])
-	assert_array_almost_equal(model._model._xw_starts_sum, [0., 0.])
-	assert_array_almost_equal(model._model._xw_ends_sum, [0., 0.])
+	assert_array_almost_equal(model._xw_sum, [[0., 0.], [0., 0.]])
+	assert_array_almost_equal(model._xw_starts_sum, [0., 0.])
+	assert_array_almost_equal(model._xw_ends_sum, [0., 0.])
 
 
 def test_initialize(X):
 	d = [Exponential(), Exponential()]
-	model = HiddenMarkovModel(d, kind='dense', random_state=0)
+	model = DenseHMM(d, random_state=0)
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -183,20 +159,19 @@ def test_initialize(X):
 	assert model.d is None
 	assert model.n_distributions == 2
 	assert model._initialized == False
-	assert model._model is None
 
 	assert d1._initialized == False
 	assert d2._initialized == False
 
-	assert_raises(AttributeError, getattr, model._model, "_xw_sum")
-	assert_raises(AttributeError, getattr, model._model, "_xw_starts_sum")
-	assert_raises(AttributeError, getattr, model._model, "_xw_ends_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
+	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
 	model.bake()
 	model._initialize(X)
 	assert model._initialized == True
 	assert model.d == 3
-	assert isinstance(model._model, _DenseHMM)
+	assert isinstance(model, DenseHMM)
 
 	assert d1._initialized == True
 	assert d2._initialized == True
@@ -253,8 +228,8 @@ def test_sample_length(model):
 	         [0.3, 0.6]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, ends=ends,
-		kind='dense', sample_length=3, random_state=0)
+	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
+		sample_length=3, random_state=0)
 	model.bake()
 
 	X = model.sample(25)
@@ -271,8 +246,8 @@ def test_sample_paths(model):
 	         [0.6, 0.3]]
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=edges, starts=starts, ends=ends,
-		kind='dense', return_sample_paths=True, random_state=0)
+	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
+		return_sample_paths=True, random_state=0)
 	model.bake()
 
 	X, path = model.sample(1)
@@ -554,10 +529,10 @@ def test_partial_summarize(model, X):
 	d2 = model.distributions[1]
 	model.summarize(X[:1])
 
-	assert_array_almost_equal(model._model._xw_sum,
+	assert_array_almost_equal(model._xw_sum,
 		[[2.635337e-04, 1.430405e-01], [8.828942e-01, 2.973798e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 0.863595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876259, 0.123741], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 0.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876259, 0.123741], 4)
 
 	assert_array_almost_equal(d1._w_sum, [1.019563, 1.019563, 1.019563], 4)
 	assert_array_almost_equal(d1._xw_sum, [2.765183, 1.149069, 0.006899], 4)
@@ -566,10 +541,10 @@ def test_partial_summarize(model, X):
 	assert_array_almost_equal(d2._xw_sum, [4.234818, 4.850933, 4.9931], 4)	
 
 	model.summarize(X[1:])
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[2.666838e-04, 1.895245e+00], [2.635103e+00, 3.469387e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
 	assert_array_almost_equal(d1._w_sum, [2.771773, 2.771773, 2.771773], 4)
 	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904], 4)
@@ -583,10 +558,10 @@ def test_summarize(model, X):
 	d2 = model.distributions[1]
 	model.summarize(X)
 
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[2.666838e-04, 1.895245e+00], [2.635103e+00, 3.469387e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 1.863595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876264, 1.123736], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
 	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771], 4)
 	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904], 4)
@@ -600,10 +575,10 @@ def test_summarize_weighted(model, X, w):
 	d2 = model.distributions[1]
 	model.summarize(X, sample_weight=w)
 
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[2.707788e-04, 4.173112e+00], [4.912973e+00, 4.113652e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 3.163595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876271, 2.423729], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729], 4)
 
 	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643], 4)
 	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
@@ -672,8 +647,8 @@ def test_from_summaries_weighted(model, X, w):
 
 def test_from_summaries_inertia(X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.3)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -698,8 +673,8 @@ def test_from_summaries_inertia(X):
 
 	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -724,8 +699,8 @@ def test_from_summaries_inertia(X):
 
 def test_from_summaries_weighted_inertia(X, w):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.3)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -751,8 +726,8 @@ def test_from_summaries_weighted_inertia(X, w):
 
 	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -777,8 +752,8 @@ def test_from_summaries_weighted_inertia(X, w):
 
 def test_from_summaries_frozen(model, X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', frozen=True)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], frozen=True)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -803,8 +778,8 @@ def test_from_summaries_frozen(model, X):
 
 	d = [Exponential([2.1, 0.3, 0.1], frozen=True), 
 	     Exponential([1.5, 3.1, 2.2], frozen=True)]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', inertia=0.0)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
 	model.bake()
 
 	d1 = model.distributions[0]
@@ -831,8 +806,8 @@ def test_fit(X):
 	X = torch.tensor(numpy.array(X) + 1)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=1)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
 	model.bake()
 	model.fit(X)
 	
@@ -853,8 +828,8 @@ def test_fit(X):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=5)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
 	model.bake()
 	model.fit(X)
 
@@ -880,8 +855,8 @@ def test_fit_weighted(X, w):
 	X = torch.tensor(numpy.array(X) + 1)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=1)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
 	model.bake()
 	model.fit(X, sample_weight=w)
 	
@@ -902,8 +877,8 @@ def test_fit_weighted(X, w):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=5)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
 	model.bake()
 	model.fit(X, sample_weight=w)
 
@@ -1240,10 +1215,10 @@ def test_masked_ones_summarize(model, X, w):
 	d2 = model.distributions[1]
 	model.summarize(X_, sample_weight=w)
 
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[2.707788e-04, 4.173112e+00], [4.912973e+00, 4.113652e+00]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.136405, 3.163595], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [0.876271, 2.423729], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729], 4)
 
 	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643], 4)
 	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
@@ -1258,10 +1233,10 @@ def test_masked_summarize(model, X, X_masked, w):
 	d2 = model.distributions[1]
 	model.summarize(X_masked, sample_weight=w)
 
-	assert_array_almost_equal(model._model._xw_sum, 
+	assert_array_almost_equal(model._xw_sum, 
 		[[0.2535, 4.3662], [5.4712, 3.1091]], 4)
-	assert_array_almost_equal(model._model._xw_starts_sum, [0.1143, 3.1857], 4)
-	assert_array_almost_equal(model._model._xw_ends_sum, [1.2194, 2.0806], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.1143, 3.1857], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [1.2194, 2.0806], 4)
 
 	assert_array_almost_equal(d1._w_sum, [3.1268, 4.9249, 4.9249], 4)
 	assert_array_almost_equal(d1._xw_sum, [4.6491e+00, 5.0392e+00, 3.9227e-08],
@@ -1325,8 +1300,8 @@ def test_masked_fit(X, X_masked):
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=5)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
 	model.bake()
 	model.fit(X_)
 
@@ -1349,8 +1324,8 @@ def test_masked_fit(X, X_masked):
 
 
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = HiddenMarkovModel(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], kind='dense', max_iter=5)
+	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
+		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
 	model.bake()
 	model.fit(X_masked + 1)
 

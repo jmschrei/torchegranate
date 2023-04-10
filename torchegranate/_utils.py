@@ -40,7 +40,7 @@ def _cast_as_tensor(value, dtype=None):
 	if value is None:
 		return None
 
-	if isinstance(value, (torch.nn.Parameter, torch.Tensor)):
+	if isinstance(value, (torch.nn.Parameter, torch.Tensor, torch.masked.MaskedTensor)):
 		if dtype is None:
 			return value
 		elif value.dtype == dtype:

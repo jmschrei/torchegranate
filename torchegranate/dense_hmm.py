@@ -1,4 +1,4 @@
-# _dense_hmm.py
+# dense_hmm.py
 # Author: Jacob Schreiber <jmschreiber91@gmail.com>
 
 import math
@@ -12,8 +12,7 @@ from ._utils import _check_parameter
 
 from .distributions._distribution import Distribution
 
-from ._bayes import BayesMixin
-from ._base import GraphMixin
+from ._base import _BaseHMM
 
 
 NEGINF = float("-inf")
@@ -54,7 +53,7 @@ def _convert_to_dense_edges(distributions, edges, starts, ends, start, end,
 		return _edges, starts, ends
 
 
-class _DenseHMM(Distribution):
+class DenseHMM(_BaseHMM):
 	"""A hidden Markov model with a dense transition matrix.
 
 	A hidden Markov model is an extension of a mixture model to sequences by
@@ -116,34 +115,29 @@ class _DenseHMM(Distribution):
 	"""
 
 
-	def __init__(self, distributions, edges, start, end, starts=None, ends=None, max_iter=10, 
-		tol=0.1, sample_length=None, return_sample_paths=False, inertia=0.0, 
-		frozen=False, random_state=None):
-		super().__init__(inertia=inertia, frozen=frozen)
-		self.name = "_DenseHMM"
+	def __init__(self, distributions=None, edges=None, starts=None, ends=None, 
+		init='random', max_iter=1000, tol=0.1, sample_length=None, 
+		return_sample_paths=False, inertia=0.0, frozen=False, random_state=None, 
+		verbose=False):
+		
+		super().__init__(distributions=distributions, edges=edges, 
+			starts=starts, ends=ends, init=init, max_iter=max_iter, tol=tol,
+			sample_length=sample_length, 
+			return_sample_paths=return_sample_paths, inertia=inertia,
+			frozen=frozen, random_state=random_state, verbose=verbose)
+		self.name = "DenseHMM"
 
 		self.distributions = torch.nn.ModuleList(distributions)
 		self.edges, self.starts, self.ends = _convert_to_dense_edges(
-			distributions, edges, starts, ends, start, end, 
-			dtype=self.dtype)
+			self.distributions, self.edges, self.starts, self.ends, self.start, 
+			self.end, dtype=self.dtype)
 
-		self.n_distributions = len(distributions)
-		self.n_edges = len(edges)
-
-		self.sample_length = sample_length
-		self.return_sample_paths = return_sample_paths
-
-		if not isinstance(random_state, numpy.random.RandomState):
-			self.random_state = numpy.random.RandomState(random_state)
-		else:
-			self.random_state = random_state
+		n = self.n_distributions
 
 		if torch.isinf(self.starts).sum() == len(self.starts):
-			self.starts = _cast_as_parameter(torch.ones(self.n_distributions)
-				/ self.n_distributions)
+			self.starts = _cast_as_parameter(torch.ones(n) / n)
 		if torch.isinf(self.ends).sum() == len(self.ends):
-			self.ends = _cast_as_parameter(torch.ones(self.n_distributions) 
-				/ self.n_distributions)
+			self.ends = _cast_as_parameter(torch.ones(n) / n)
 
 		self._reset_cache()
 
@@ -156,6 +150,12 @@ class _DenseHMM(Distribution):
 		calculations.
 		"""
 
+		if self._initialized == False:
+			return
+
+		for node in self.distributions:
+			node._reset_cache()
+
 		self.register_buffer("_xw_sum", torch.zeros(self.n_distributions, 
 			self.n_distributions, dtype=self.dtype, requires_grad=False, 
 			device=self.device))
@@ -165,6 +165,9 @@ class _DenseHMM(Distribution):
 
 		self.register_buffer("_xw_ends_sum", torch.zeros(self.n_distributions, 
 			dtype=self.dtype, requires_grad=False, device=self.device))
+
+	def bake(self):
+		return self
 
 	def sample(self, n):
 		"""Sample from the probability distribution.
@@ -223,8 +226,7 @@ class _DenseHMM(Distribution):
 			return emissions, distributions
 		return emissions
 
-	@torch.inference_mode()
-	def forward(self, emissions, priors):
+	def forward(self, X=None, emissions=None, priors=None, check_inputs=True):
 		"""Run the forward algorithm on some data.
 
 		Runs the forward algorithm on a batch of sequences. This is not to be
@@ -240,18 +242,25 @@ class _DenseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call. 		
+			to precalculate these and pass them into each call.
 
-		priors: torch.Tensor, shape=(-1, -1, self.n_distributions)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
 
 		Returns
 		-------
@@ -259,7 +268,8 @@ class _DenseHMM(Distribution):
 			The log probabilities calculated by the forward algorithm.
 		"""
 
-		print(self.edges.dtype, self.starts.dtype, emissions.dtype, priors.dtype)
+		emissions, priors = super().forward(X=X, emissions=emissions, 
+			priors=priors, check_inputs=check_inputs)
 
 		l = emissions.shape[1]
 
@@ -277,8 +287,7 @@ class _DenseHMM(Distribution):
 		f = f.permute(1, 0, 2)
 		return f
 
-	@torch.inference_mode()
-	def backward(self, emissions, priors):
+	def backward(self, X=None, emissions=None, priors=None, check_inputs=True):
 		"""Run the backward algorithm on some data.
 
 		Runs the backward algorithm on a batch of sequences. This is not to be
@@ -295,17 +304,25 @@ class _DenseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, l, self.n_distributions)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
 			to precalculate these and pass them into each call.
 
-		priors: torch.Tensor, shape=(-1, l, self.n_distributions)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
+
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
 
 
 		Returns
@@ -314,9 +331,13 @@ class _DenseHMM(Distribution):
 			The log probabilities calculated by the backward algorithm.
 		"""
 
+		emissions, priors = super().backward(X=X, emissions=emissions, 
+			priors=priors, check_inputs=check_inputs)
+
 		n, l, _ = emissions.shape
 
-		b = torch.zeros(l, n, self.n_distributions, dtype=torch.float32, device=self.device) + float("-inf")
+		b = torch.zeros(l, n, self.n_distributions, dtype=torch.float32, 
+			device=self.device) + float("-inf")
 		b[-1] = self.ends
 
 		t_max = self.edges.max()
@@ -332,8 +353,8 @@ class _DenseHMM(Distribution):
 		b = b.permute(1, 0, 2)
 		return b
 
-	@torch.inference_mode()
-	def forward_backward(self, emissions, priors):
+	def forward_backward(self, X=None, emissions=None, priors=None, 
+		check_inputs=True):
 		"""Run the forward-backward algorithm on some data.
 
 		Runs the forward-backward algorithm on a batch of sequences. This
@@ -349,39 +370,47 @@ class _DenseHMM(Distribution):
 		
 		Parameters
 		----------
-		emissions: torch.Tensor, shape=(-1, -1, self.n_distributions)
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
+			A set of examples to evaluate. Does not need to be passed in if
+			emissions are. 
+
+		emissions: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, n_distributions)
 			Precalculated emission log probabilities. These are the
 			probabilities of each observation under each probability 
 			distribution. When running some algorithms it is more efficient
-			to precalculate these and pass them into each call.	
+			to precalculate these and pass them into each call.
 
-		priors: torch.Tensor, shape=(-1, -1, self.n_distributions)
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, d)
 			Prior probabilities of assigning each symbol to each node. If not
 			provided, do not include in the calculations (conceptually
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
+		check_inputs: bool, optional
+			Whether to check the shape of the inputs and calculate emission
+			matrices. Default is True.
+
 
 		Returns
 		-------
-		transitions: torch.Tensor, shape=(-1, self.n_distributions, self.n_distributions)
+		transitions: torch.Tensor, shape=(-1, n, n)
 			The expected number of transitions across each edge that occur
 			for each example. The returned transitions follow the structure
 			of the transition matrix and so will be dense or sparse as
 			appropriate.
 
-		responsibility: torch.Tensor, shape=(-1, -1, self.n_distributions)
+		responsibility: torch.Tensor, shape=(-1, -1, n)
 			The posterior probabilities of each observation belonging to each
 			state given that one starts at the beginning of the sequence,
 			aligns observations across all paths to get to the current
 			observation, and then proceeds to align all remaining observations
 			until the end of the sequence.
 
-		starts: torch.Tensor, shape=(-1, self.n_distributions)
+		starts: torch.Tensor, shape=(-1, n)
 			The probabilities of starting at each node given the 
 			forward-backward algorithm.
 
-		ends: torch.Tensor, shape=(-1, self.n_distributions)
+		ends: torch.Tensor, shape=(-1, n)
 			The probabilities of ending at each node given the forward-backward
 			algorithm.
 
@@ -389,10 +418,13 @@ class _DenseHMM(Distribution):
 			The log probabilities of each sequence given the model.
 		"""
 
+		emissions, priors = super().forward_backward(X=X, emissions=emissions,
+			priors=priors, check_inputs=check_inputs)
+
 		n, l, _ = emissions.shape
 
-		f = self.forward(emissions, priors=priors)
-		b = self.backward(emissions, priors=priors)
+		f = self.forward(emissions=emissions, priors=priors)
+		b = self.backward(emissions=emissions, priors=priors)
 
 		logp = torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
@@ -450,7 +482,8 @@ class _DenseHMM(Distribution):
 		ends = torch.zeros_like(starts)
 		ends[torch.arange(n), y[:, -1]] = 1
 
-		t = torch.zeros((n, self.n_distributions, self.n_distributions), device=self.device)
+		t = torch.zeros((n, self.n_distributions, self.n_distributions), 
+			device=self.device)
 		r = torch.zeros(n, l, self.n_distributions, device=self.device) - inf
 
 		for i in range(n):
@@ -468,7 +501,7 @@ class _DenseHMM(Distribution):
 		return t, r, starts, ends, logps
 
 	def summarize(self, X, y=None, sample_weight=None, emissions=None, 
-		priors=None):
+		priors=None, check_inputs=True):
 		"""Extract the sufficient statistics from a batch of data.
 
 		This method calculates the sufficient statistics from optionally
@@ -506,12 +539,15 @@ class _DenseHMM(Distribution):
 			probabilities).
 		"""
 
+		X, emissions, priors, sample_weight = super().summarize(X, 
+			sample_weight=sample_weight, emissions=emissions, priors=priors)
+
 		if y is None:
-			t, r, starts, ends, logps = self.forward_backward(emissions, 
-				priors=priors)
+			t, r, starts, ends, logps = self.forward_backward(
+				emissions=emissions, priors=priors, check_inputs=check_inputs)
 		else:
-			t, r, starts, ends, logps = self._labeled_summarize(emissions, 
-				y=y)
+			t, r, starts, ends, logps = self._labeled_summarize(
+				emissions=emissions, y=y)
 
 		self._xw_starts_sum += torch.sum(starts * sample_weight, dim=0)
 		self._xw_ends_sum += torch.sum(ends * sample_weight, dim=0)

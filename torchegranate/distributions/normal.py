@@ -130,12 +130,14 @@ class Normal(Distribution):
 		if self._initialized == False:
 			return
 
-		self.register_buffer("_w_sum", torch.zeros(self.d, device=self.device))
-		self.register_buffer("_xw_sum", torch.zeros(self.d, device=self.device))
+		self.register_buffer("_w_sum", torch.zeros(self.d, dtype=self.dtype, 
+			device=self.device))
+		self.register_buffer("_xw_sum", torch.zeros(self.d, dtype=self.dtype,
+			device=self.device))
 
 		if self.covariance_type == 'full':
 			self.register_buffer("_xxw_sum", torch.zeros(self.d, self.d, 
-				device=self.device))
+				dtype=self.dtype, device=self.device))
 
 			if self.covs.sum() > 0.0:
 				chol = torch.linalg.cholesky(self.covs)
@@ -152,7 +154,7 @@ class Normal(Distribution):
 
 		elif self.covariance_type in ('diag', 'sphere'):
 			self.register_buffer("_xxw_sum", torch.zeros(self.d, 
-				device=self.device))
+				dtype=self.dtype, device=self.device))
 
 			if self.covs.sum() > 0.0:
 				_log_sigma_sqrt_2pi = -torch.log(torch.sqrt(self.covs) * 
@@ -161,7 +163,9 @@ class Normal(Distribution):
 
 				self.register_buffer("_log_sigma_sqrt_2pi", _log_sigma_sqrt_2pi)
 				self.register_buffer("_inv_two_sigma", _inv_two_sigma)
-			else:
+			
+			if any(self.covs < 0):
+				print(self.covs)
 				raise ValueError("Variances must be positive.")
 
 	def sample(self, n):
