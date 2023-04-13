@@ -4,4 +4,4 @@ from .kmeans import KMeans
 
 from .distributions import *
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

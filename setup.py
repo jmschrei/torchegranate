@@ -2,10 +2,10 @@ from setuptools import setup
 
 setup(
 	name='torchegranate',
-	version='0.4.0',
+	version='0.5.0',
 	author='Jacob Schreiber',
 	author_email='jmschreiber91@gmail.com',
-	packages=['torchegranate', 'torchegranate.distributions'],
+	packages=['torchegranate', 'torchegranate.distributions', 'torchegranate.hmm'],
 	url='https://github.com/jmschrei/torchegranate',
 	license='LICENSE.txt',
 	description='A rewrite of pomegranate using PyTorch.',

@@ -141,9 +141,6 @@ class Normal(Distribution):
 
 			if self.covs.sum() > 0.0:
 				chol = torch.linalg.cholesky(self.covs)
-
-				print(self.dtype, self.device, chol.dtype, chol.device)
-
 				_inv_cov = torch.linalg.solve_triangular(chol, torch.eye(
 					len(self.covs), dtype=self.dtype, device=self.device), 
 					upper=False).T
@@ -169,7 +166,6 @@ class Normal(Distribution):
 				self.register_buffer("_inv_two_sigma", _inv_two_sigma)
 			
 			if any(self.covs < 0):
-				print(self.covs)
 				raise ValueError("Variances must be positive.")
 
 	def sample(self, n):

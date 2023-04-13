@@ -315,6 +315,9 @@ class _BaseHMM(Distribution, GraphMixin):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
 			shape=(-1, -1, self.d), check_parameter=self.check_data)
 
+		if not self._initialized:
+			self._initialize()
+
 		n, k, _ = X.shape
 		X = X.reshape(n*k, self.d)
 
@@ -329,6 +332,77 @@ class _BaseHMM(Distribution, GraphMixin):
 			e[:, i] = logp.reshape(n, k).T
 
 		return e.permute(2, 0, 1)
+
+	@property
+	def n_distributions(self):
+		return len(self.distributions) if self.distributions is not None else 0
+
+	def add_distribution(self, distribution):
+		"""Add a distribution to the model.
+
+
+		Parameters
+		----------
+		distribution: torchegranate.distributions.Distribution
+			A distribution object.
+		"""
+
+		if self.distributions is None:
+			self.distributions = []
+
+		if not isinstance(distribution, Distribution):
+			raise ValueError("distribution must be a distribution object.")
+
+		self.distributions.append(distribution)
+		self.d = distribution.d
+
+	def add_distributions(self, distributions):
+		"""Add a set of distributions to the model.
+
+		This method will iterative call the `add_distribution`.
+
+
+		Parameters
+		----------
+		distrbutions: list, tuple, iterable
+			A set of distributions to add to the model.
+		"""
+
+		for distribution in distributions:
+			self.add_distribution(distribution)
+
+	def add_edge(self, start, end, probability):
+		"""Add an edge to the model.
+
+		This method takes in two distribution objects and the probability
+		connecting the two and adds an edge to the model.
+
+
+		Parameters
+		----------
+		start: torchegranate.distributions.Distribution
+			The parent node for the edge
+
+		end: torchegranate.distributions.Distribution
+			The child node for the edge
+
+		probability: float, (0, 1]
+			The probability of connecting the two.
+		"""
+
+		if not isinstance(start, Distribution):
+			raise ValueError("start must be a distribution.")
+
+		if not isinstance(end, Distribution):
+			raise ValueError("end must be a distribution.")
+
+		if not isinstance(probability, float):
+			raise ValueError("probability must be a float.")
+
+		if self.edges is None:
+			self.edges = []
+
+		self.edges.append((start, end, probability))
 
 	def log_probability(self, X, priors=None):
 		"""Calculate the log probability of each example.
