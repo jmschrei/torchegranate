@@ -67,11 +67,17 @@ class JointCategorical(Distribution):
 		If you want to freeze individual pameters, or individual values in those
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
+
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
 	"""
 	
 	def __init__(self, probs=None, n_categories=None, pseudocount=0, 
-		inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		inertia=0.0, frozen=False, check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "JointCategorical"
 
 		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
@@ -196,7 +202,7 @@ class JointCategorical(Distribution):
 
 		X = _check_parameter(_cast_as_tensor(X), "X", 
 			value_set=tuple(range(max(self.n_categories)+1)), ndim=2, 
-			shape=(-1, self.d))
+			shape=(-1, self.d), check_parameter=self.check_data)
 
 		logps = torch.zeros(len(X), dtype=self.probs.dtype)
 		for i in range(len(X)):
@@ -229,13 +235,14 @@ class JointCategorical(Distribution):
 			return
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
-			dtypes=(torch.int32, torch.int64))
+			dtypes=(torch.int32, torch.int64), check_parameter=self.check_data)
 
 		if not self._initialized:
 			self._initialize(len(X[0]), torch.max(X, dim=0)[0]+1)
 
 		X = _check_parameter(X, "X", shape=(-1, self.d), 
-			value_set=tuple(range(max(self.n_categories)+1)))
+			value_set=tuple(range(max(self.n_categories)+1)), 
+			check_parameter=self.check_data)
 
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
 			dtype=torch.float32))[:,0]

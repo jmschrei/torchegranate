@@ -59,12 +59,16 @@ class BayesClassifier(BayesMixin, Distribution):
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
 
-	verbose: bool, optional
-		Whether to print the improvement and timings during training.
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling. Default is True.
 	"""
 
-	def __init__(self, distributions, priors=None, inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+	def __init__(self, distributions, priors=None, inertia=0.0, frozen=False,
+		check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "BayesClassifier"
 
 		_check_parameter(distributions, "distributions", dtypes=(list, tuple, 
@@ -172,9 +176,10 @@ class BayesClassifier(BayesMixin, Distribution):
 
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
 		y = _check_parameter(_cast_as_tensor(y), "y", min_value=0, 
-			max_value=self.k-1, ndim=1, shape=(len(X),))
+			max_value=self.k-1, ndim=1, shape=(len(X),), 
+			check_parameter=self.check_data)
 		sample_weight = _check_parameter(sample_weight, "sample_weight", 
-			min_value=0, shape=(-1, self.d))
+			min_value=0, shape=(-1, self.d), check_parameter=self.check_data)
 
 		for j, d in enumerate(self.distributions):
 			idx = y == j

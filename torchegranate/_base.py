@@ -7,6 +7,7 @@ import numpy
 import torch
 
 from ._utils import _cast_as_tensor
+from ._utils import _cast_as_parameter
 from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
@@ -42,19 +43,48 @@ def _check_inputs(model, X, emissions, priors):
 	return emissions, priors
 
 
-class Silent(torch.nn.Module):
+class Silent(Distribution):
 	def __init__(self):
-		super().__init__()
+		super().__init__(inertia=0.0, frozen=False, check_data=True)
 
 
 class GraphMixin(torch.nn.Module):
-	def add_node(self, node):
-		self.nodes.append(node)
+	@property
+	def n_distributions(self):
+		return len(self.distributions) if self.distributions is not None else 0
 
-	def add_nodes(self, nodes):
-		self.nodes.extend(nodes)
+	def add_distribution(self, distribution):
+		if self.distributions is None:
+			self.distributions = []
+
+		if not isinstance(distribution, Distribution):
+			raise ValueError("distribution must be a distribution object.")
+
+		self.distributions.append(distribution)
+
+	def add_distributions(self, distributions):
+		if self.distributions is None:
+			self.distributions = []
+
+		for d in distributions:
+			if not isinstance(d, Distribution):
+				raise ValueError("distribution must be a distribution object.")
+
+		self.distributions.extend(distributions)
 
 	def add_edge(self, start, end, probability=None):
+		if not isinstance(start, Distribution):
+			raise ValueError("start must be a distribution.")
+
+		if not isinstance(end, Distribution):
+			raise ValueError("end must be a distribution.")
+
+		if probability is not None and not isinstance(probability, float):
+			raise ValueError("probability must be a float.")
+
+		if self.edges is None:
+			self.edges = []
+
 		if probability is None:
 			edge = start, end
 		else:
@@ -63,7 +93,7 @@ class GraphMixin(torch.nn.Module):
 		self.edges.append(edge)
 
 
-class _BaseHMM(Distribution):
+class _BaseHMM(Distribution, GraphMixin):
 	"""A base hidden Markov model.
 
 	A hidden Markov model is an extension of a mixture model to sequences by
@@ -155,42 +185,40 @@ class _BaseHMM(Distribution):
 		The random state to make randomness deterministic. If None, not
 		deterministic. Default is None.
 
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
+
 	verbose: bool, optional
 		Whether to print the improvement and timings during training.
 	"""
 
-	def __init__(self, distributions=None, edges=None, starts=None, ends=None, 
+	def __init__(self, distributions=None, starts=None, ends=None, 
 		init='random', max_iter=1000, tol=0.1, sample_length=None, 
-		return_sample_paths=False, inertia=0.0, frozen=False, 
+		return_sample_paths=False, inertia=0.0, frozen=False, check_data=True,
 		random_state=None, verbose=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 
-		self.distributions = distributions or []
-
+		self.distributions = distributions
 		n = len(distributions) if distributions is not None else None
-		self.n_distributions = n
-		self.n_edges = len(edges) if edges is not None else None
-
-		self.edges = _check_parameter(_cast_as_tensor(edges), "edges",
-			ndim=2, shape=(n, n), min_value=0., max_value=1.)
-		self.starts = _check_parameter(_cast_as_tensor(starts), "starts",
-			ndim=1, shape=(n,), min_value=0., max_value=1., value_sum=1.0)
-		self.ends = _check_parameter(_cast_as_tensor(ends), "ends",
-			ndim=1, shape=(n,), min_value=0., max_value=1.)
-
-		if self.edges is None and distributions is not None:
-			self.edges = torch.ones(n, n, dtype=torch.float32) / n
-		elif self.edges is None and distributions is None:
-			self.edges = []
 
 		self.start = Silent()
 		self.end = Silent()
 
-		if self.starts is None and distributions is not None:
-			self.starts = torch.ones(n, dtype=torch.float32) / n
+		self.edges = None
+		self.starts = None
+		self.ends = None
 
-		if self.ends is None and distributions is not None:
-			self.ends = torch.ones(n, dtype=torch.float32) / n
+		if starts is not None:
+			self.starts = torch.log(_check_parameter(_cast_as_parameter(
+				starts), "starts", ndim=1, shape=(n,), min_value=0., 
+				max_value=1., value_sum=1.0))
+
+		if ends is not None:
+			self.ends = torch.log(_check_parameter(_cast_as_parameter(ends), 
+				"ends", ndim=1, shape=(n,), min_value=0., max_value=1.))
 
 		if not isinstance(random_state, numpy.random.RandomState):
 			self.random_state = numpy.random.RandomState(random_state)
@@ -206,11 +234,9 @@ class _BaseHMM(Distribution):
 		self.return_sample_paths = return_sample_paths
 
 		self.verbose = verbose
-
 		self.d = self.distributions[0].d if distributions is not None else None
-		self._initialized = all(n._initialized for n in self.distributions)
 
-	def _initialize(self, X, sample_weight=None):
+	def _initialize(self, X=None, sample_weight=None):
 		"""Initialize the probability distribution.
 
 		This method is meant to only be called internally. It initializes the
@@ -220,43 +246,51 @@ class _BaseHMM(Distribution):
 
 		Parameters
 		----------
-		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			The data to use to initialize the model.
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d), optional
+			The data to use to initialize the model. Default is None.
 
 		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
 			A set of weights for the examples. This can be either of shape
-			(-1, len) or a vector of shape (-1,). Default is ones.
-
-		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.n)
-			Prior probabilities of assigning each symbol to each node. If not
-			provided, do not include in the calculations (conceptually
-			equivalent to a uniform probability, but without scaling the
-			probabilities).
+			(-1, len) or a vector of shape (-1,). If None, defaults to ones.
+			Default is None.
 		"""
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
-		X = X.reshape(-1, X.shape[-1])
+		n = self.n_distributions
+		if self.starts is None:
+			self.starts = _cast_as_parameter(torch.log(torch.ones(n, 
+				dtype=self.dtype, device=self.device) / n))
 
-		if sample_weight is None:
-			sample_weight = torch.ones(1).expand(X.shape[0], 1)
-		else:
-			sample_weight = _cast_as_tensor(sample_weight).reshape(-1, 1)
-			sample_weight = _check_parameter(sample_weight, "sample_weight", 
-				min_value=0., ndim=1, shape=(len(X),)).reshape(-1, 1)
+		if self.ends is None:
+			self.ends = _cast_as_parameter(torch.log(torch.ones(n,
+				dtype=self.dtype, device=self.device) / n))
 
-		y_hat = KMeans(self.n_distributions, init=self.init, max_iter=1, 
-			random_state=self.random_state).fit_predict(X, 
-			sample_weight=sample_weight)
+		_init = all(d._initialized for d in self.distributions)
+		if X is not None and not _init:
+			X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+				check_parameter=self.check_data)
+			X = X.reshape(-1, X.shape[-1])
 
-		for i in range(self.n_distributions):
-			self.distributions[i].fit(X[y_hat == i], 
-				sample_weight=sample_weight[y_hat == i])
+			if sample_weight is None:
+				sample_weight = torch.ones(1).expand(X.shape[0], 1)
+			else:
+				sample_weight = _check_parameter(_cast_as_tensor(
+					sample_weight).reshape(-1, 1), "sample_weight", 
+					min_value=0., ndim=1, shape=(len(X),), 
+					check_parameter=check_data).reshape(-1, 1)
+
+			y_hat = KMeans(self.n_distributions, init=self.init, max_iter=1, 
+				random_state=self.random_state).fit_predict(X, 
+				sample_weight=sample_weight)
+
+			for i in range(self.n_distributions):
+				self.distributions[i].fit(X[y_hat == i], 
+					sample_weight=sample_weight[y_hat == i])
+
+			self.d = X.shape[-1]
+			super()._initialize(X.shape[-1])
 
 		self._initialized = True
 		self._reset_cache()
-		self.d = X.shape[-1]
-		super()._initialize(X.shape[-1])
-
 
 	def _emission_matrix(self, X):
 		"""Return the emission/responsibility matrix.
@@ -279,7 +313,7 @@ class _BaseHMM(Distribution):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
-			shape=(-1, -1, self.d))
+			shape=(-1, -1, self.d), check_parameter=self.check_data)
 
 		n, k, _ = X.shape
 		X = X.reshape(n*k, self.d)
@@ -296,7 +330,7 @@ class _BaseHMM(Distribution):
 
 		return e.permute(2, 0, 1)
 
-	def log_probability(self, X, priors=None, check_inputs=True):
+	def log_probability(self, X, priors=None):
 		"""Calculate the log probability of each example.
 
 		This method calculates the log probability of each example given the
@@ -315,10 +349,6 @@ class _BaseHMM(Distribution):
 			equivalent to a uniform probability, but without scaling the
 			probabilities).
 
-		check_inputs: bool, optional
-			Whether to check the shape of the inputs and calculate emission
-			matrices. Default is True.
-
 
 		Returns
 		-------
@@ -326,7 +356,7 @@ class _BaseHMM(Distribution):
 			The log probability of each example.
 		"""
 
-		f = self.forward(X, priors=priors, check_inputs=check_inputs)
+		f = self.forward(X, priors=priors)
 		return torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
 	def predict_log_proba(self, X, priors=None):
@@ -529,7 +559,7 @@ class _BaseHMM(Distribution):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
-			shape=(-1, -1, self.d))
+			shape=(-1, -1, self.d), check_parameter=self.check_data)
 		emissions, priors = _check_inputs(self, X, emissions, priors)
 		
 		if sample_weight is None:
@@ -538,7 +568,8 @@ class _BaseHMM(Distribution):
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight),
 				"sample_weight", min_value=0., ndim=1, 
-				shape=(emissions.shape[0],)).reshape(-1, 1)
+				shape=(emissions.shape[0],), 
+				check_parameter=self.check_data).reshape(-1, 1)
 
 		if not self._initialized and y is None:
 			self._initialize(X, sample_weight=sample_weight)

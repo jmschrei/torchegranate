@@ -20,8 +20,8 @@ class ConditionalCategorical(ConditionalDistribution):
 	"""Still under development."""
 	
 	def __init__(self, probs=None, n_categories=None, pseudocount=0, 
-		check_inputs=True, inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		inertia=0.0, frozen=False, check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "ConditionalCategorical"
 
 		if probs is not None:
@@ -40,7 +40,6 @@ class ConditionalCategorical(ConditionalDistribution):
 			self.n_categories = n_categories
 		
 		self.pseudocount = _check_parameter(pseudocount, "pseudocount")
-		self.check_inputs = check_inputs
 
 		self._initialized = probs is not None
 		self.d = len(self.probs) if self._initialized else None
@@ -125,7 +124,7 @@ class ConditionalCategorical(ConditionalDistribution):
 
 	def log_probability(self, X):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
-			shape=(-1, self.n_parents, self.d))
+			shape=(-1, self.n_parents, self.d), check_parameter=self.check_data)
 
 		logps = torch.zeros(len(X), dtype=self.probs[0].dtype, device=X.device, 
 			requires_grad=False)
@@ -141,13 +140,13 @@ class ConditionalCategorical(ConditionalDistribution):
 			return
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
-			dtypes=(torch.int32, torch.int64))
+			dtypes=(torch.int32, torch.int64), check_parameter=self.check_data)
 
 		if not self._initialized:
 			self._initialize(len(X[0][0]), torch.max(X, dim=0)[0].T+1)
 
 		X = _check_parameter(X, "X", shape=(-1, self.n_parents, self.d),
-			check_parameter=self.check_inputs)
+			check_parameter=self.check_data)
 		sample_weight = _check_parameter(_cast_as_tensor(sample_weight, 
 			dtype=torch.float32), "sample_weight", min_value=0, ndim=(1, 2))
 

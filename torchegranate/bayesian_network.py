@@ -87,6 +87,12 @@ class BayesianNetwork(Distribution):
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
 
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling. Default is True.
+
 	verbose: bool, optional
 		Whether to print the improvement and timings during training.
 	"""
@@ -94,8 +100,8 @@ class BayesianNetwork(Distribution):
 	def __init__(self, distributions=None, edges=None, structure=None,
 		algorithm=None, include_parents=None, exclude_parents=None, 
 		max_parents=None, pseudocount=0.0, max_iter=20, tol=1e-6, inertia=0.0, 
-		frozen=False, verbose=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		frozen=False, check_data=True, verbose=False):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "BayesianNetwork"
 
 		self.distributions = torch.nn.ModuleList([])
@@ -334,7 +340,8 @@ class BayesianNetwork(Distribution):
 			The log probability of each example.
 		"""
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
+			check_parameter=self.check_data)
 		
 		logps = torch.zeros(X.shape[0], device=X.device, dtype=torch.float32)
 		for i, distribution in enumerate(self.distributions):
@@ -481,8 +488,6 @@ class BayesianNetwork(Distribution):
 
 		return [torch.log(t) for t in self.predict_proba(X)]
 
-
-
 	def fit(self, X, sample_weight=None):
 		"""Fit the model to optionally weighted examples.
 
@@ -562,7 +567,8 @@ class BayesianNetwork(Distribution):
 			self._initialize(len(X[0]))
 
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
-		X = _check_parameter(X, "X", min_value=0, ndim=2)
+		X = _check_parameter(X, "X", min_value=0, ndim=2, 
+			check_parameter=self.check_data)
 
 		for i, distribution in enumerate(self.distributions):
 			parents = self._parents[i] + (i,)

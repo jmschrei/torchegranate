@@ -49,16 +49,21 @@ class Categorical(Distribution):
 		If you want to freeze individual pameters, or individual values in those
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
+
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
 	"""
 
 	def __init__(self, probs=None, n_categories=None, pseudocount=0.0, 
-		inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		inertia=0.0, frozen=False, check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "Categorical"
 
 		self.probs = _check_parameter(_cast_as_parameter(probs), "probs", 
 			min_value=0, max_value=1, ndim=2)
-
 
 		self.pseudocount = pseudocount
 
@@ -162,7 +167,8 @@ class Categorical(Distribution):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", min_value=0.0,
-			max_value=self.n_keys-1, ndim=2, shape=(-1, self.d))
+			max_value=self.n_keys-1, ndim=2, shape=(-1, self.d),
+			check_parameter=self.check_data)
 
 		logps = torch.zeros(X.shape[0], dtype=self.probs.dtype)
 		for i in range(self.d):
@@ -199,7 +205,7 @@ class Categorical(Distribution):
 			self._initialize(X.shape[1], n_keys)
 
 		X = _check_parameter(X, "X", min_value=0, max_value=self.n_keys-1, 
-			ndim=2, shape=(-1, self.d))
+			ndim=2, shape=(-1, self.d), check_parameter=self.check_data)
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight))
 
 		self._w_sum += torch.sum(sample_weight, dim=0)

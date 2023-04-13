@@ -7,6 +7,7 @@ import pytest
 
 from torchegranate.dense_hmm import DenseHMM
 from torchegranate.distributions import Exponential
+from torchegranate.distributions import Gamma
 
 from .distributions._utils import _test_initialization_raises_one_parameter
 from .distributions._utils import _test_initialization
@@ -73,13 +74,33 @@ def model():
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends, 
 		random_state=0)
-	#model.bake()
 	return model
+
+
+@pytest.fixture
+def model2():
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
+	model = DenseHMM()
+	model.add_distributions([d1, d2])
+	model.add_edge(model.start, d1, 0.2)
+	model.add_edge(model.start, d2, 0.8)
+	
+	model.add_edge(d1, d1, 0.1)
+	model.add_edge(d1, d2, 0.8)
+	model.add_edge(d1, model.end, 0.1)
+
+	model.add_edge(d2, d1, 0.3)
+	model.add_edge(d2, d2, 0.6)
+	model.add_edge(d2, model.end, 0.1)
+	return model
+
 
 ###
 
 
-def test_initialization():
+def test_initialization(X):
 	d = [Exponential(), Exponential()]
 	model = DenseHMM(d)
 
@@ -87,15 +108,104 @@ def test_initialization():
 	assert model.frozen == False
 	assert model.n_distributions == 2
 
-	assert_array_almost_equal(model.ends, numpy.log([0.5, 0.5]))
-	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
-	assert_array_almost_equal(model.edges, numpy.log([[0.5, 0.5], [0.5, 0.5]]))
-
 	assert_raises(AttributeError, getattr, model, "_xw_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
-	assert isinstance(model, DenseHMM)
+	assert model.starts is None
+	assert model.ends is None
+	assert model.edges is None
+
+
+def test_add_distribution():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = DenseHMM()
+	assert model.distributions == None
+	assert model.n_distributions == 0
+
+	model.add_distribution(d1)
+	assert model.distributions == [d1]
+	assert model.n_distributions == 1
+
+	model.add_distribution(d2)
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model = DenseHMM([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model.add_distribution(d1)
+	assert model.distributions == [d1, d2, d1]
+	assert model.n_distributions == 3
+
+
+def test_add_distributions():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = DenseHMM()
+	assert model.distributions == None
+	assert model.n_distributions == 0
+
+	model.add_distributions([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model = DenseHMM([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model.add_distributions([d1, d2])
+	assert model.distributions == [d1, d2, d1, d2]
+	assert model.n_distributions == 4
+
+
+def test_add_start_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = DenseHMM([d1, d2])
+	model.add_edge(model.start, d1, 0.3)
+	model.add_edge(model.start, d2, 0.7)
+	model._initialize()
+
+	assert_array_almost_equal(model.edges, numpy.log([[0.5, 0.5], [0.5, 0.5]]))
+	assert_array_almost_equal(model.starts, numpy.log([0.3, 0.7]))
+	assert_array_almost_equal(model.ends, numpy.log([0.5, 0.5]))
+
+
+def test_add_end_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = DenseHMM([d1, d2])
+	model.add_edge(d1, model.end, 0.2)
+	model.add_edge(d2, model.end, 0.3)
+	model._initialize()
+
+	assert_array_almost_equal(model.edges, numpy.log([[0.5, 0.5], [0.5, 0.5]]))
+	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
+	assert_array_almost_equal(model.ends, numpy.log([0.2, 0.3]))
+
+
+def test_add_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = DenseHMM([d1, d2])
+	model.add_edge(d1, d1, 0.2)
+	model.add_edge(d1, d2, 0.8)
+	model.add_edge(d2, d1, 0.3)
+	model.add_edge(d2, d2, 0.4)
+	model.add_edge(d2, model.end, 0.3)
+	model._initialize()
+
+	assert_array_almost_equal(model.edges, numpy.log([[0.2, 0.8], [0.3, 0.4]]))
+	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
+	assert_array_almost_equal(model.ends, numpy.log([0.0, 0.3]))
 
 
 def test_initialization_raises():
@@ -167,7 +277,6 @@ def test_initialize(X):
 	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
-	model.bake()
 	model._initialize(X)
 	assert model._initialized == True
 	assert model.d == 3
@@ -230,7 +339,6 @@ def test_sample_length(model):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
 		sample_length=3, random_state=0)
-	model.bake()
 
 	X = model.sample(25)
 	assert max([len(x) for x in X]) <= 3
@@ -248,7 +356,6 @@ def test_sample_paths(model):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
 		return_sample_paths=True, random_state=0)
-	model.bake()
 
 	X, path = model.sample(1)
 	assert_array_equal(path[0],
@@ -649,7 +756,6 @@ def test_from_summaries_inertia(X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -675,7 +781,6 @@ def test_from_summaries_inertia(X):
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -701,7 +806,6 @@ def test_from_summaries_weighted_inertia(X, w):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -728,7 +832,6 @@ def test_from_summaries_weighted_inertia(X, w):
 	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -754,7 +857,6 @@ def test_from_summaries_frozen(model, X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], frozen=True)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -780,7 +882,6 @@ def test_from_summaries_frozen(model, X):
 	     Exponential([1.5, 3.1, 2.2], frozen=True)]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
 
 	d1 = model.distributions[0]
 	d2 = model.distributions[1]
@@ -808,7 +909,6 @@ def test_fit(X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
-	model.bake()
 	model.fit(X)
 	
 	d1 = model.distributions[0]
@@ -830,7 +930,6 @@ def test_fit(X):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
 	model.fit(X)
 
 	
@@ -857,7 +956,6 @@ def test_fit_weighted(X, w):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
-	model.bake()
 	model.fit(X, sample_weight=w)
 	
 	d1 = model.distributions[0]
@@ -879,7 +977,6 @@ def test_fit_weighted(X, w):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
 	model.fit(X, sample_weight=w)
 
 	
@@ -1302,7 +1399,6 @@ def test_masked_fit(X, X_masked):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
 	model.fit(X_)
 
 	
@@ -1326,7 +1422,6 @@ def test_masked_fit(X, X_masked):
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	model = DenseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
 		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
 	model.fit(X_masked + 1)
 
 	d1 = model.distributions[0]

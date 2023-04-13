@@ -35,10 +35,16 @@ class IndependentComponents(Distribution):
 	distributions: list, tuple, numpy.ndarray, torch.Tensor, shape=(d,)
 		An ordered iterable containing all of the distributions, one per
 		feature, that will be used.
+
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
 	"""
 
-	def __init__(self, distributions):
-		super().__init__(inertia=0.0, frozen=False)
+	def __init__(self, distributions, check_data=False):
+		super().__init__(inertia=0.0, frozen=False, check_data=check_data)
 		self.name = "IndependentComponents"
 
 		if len(distributions) <= 1:

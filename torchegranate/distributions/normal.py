@@ -71,8 +71,8 @@ class Normal(Distribution):
 	"""
 
 	def __init__(self, means=None, covs=None, covariance_type='full', 
-		min_cov=None, inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		min_cov=None, inertia=0.0, frozen=False, check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "Normal"
 
 		self.means = _check_parameter(_cast_as_parameter(means), "means", 
@@ -141,8 +141,12 @@ class Normal(Distribution):
 
 			if self.covs.sum() > 0.0:
 				chol = torch.linalg.cholesky(self.covs)
+
+				print(self.dtype, self.device, chol.dtype, chol.device)
+
 				_inv_cov = torch.linalg.solve_triangular(chol, torch.eye(
-					len(self.covs)), upper=False).T
+					len(self.covs), dtype=self.dtype, device=self.device), 
+					upper=False).T
 				_inv_cov_dot_mu = torch.matmul(self.means, _inv_cov)
 				_log_det = -0.5 * torch.linalg.slogdet(self.covs)[1]
 				_theta = _log_det - 0.5 * (self.d * LOG_2_PI)
@@ -219,7 +223,7 @@ class Normal(Distribution):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X, dtype=self.means.dtype), "X", 
-			ndim=2, shape=(-1, self.d))
+			ndim=2, shape=(-1, self.d), check_parameter=self.check_data)
 
 		if self.covariance_type == 'full':
 			logp = torch.matmul(X, self._inv_cov) - self._inv_cov_dot_mu

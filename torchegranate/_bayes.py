@@ -55,7 +55,7 @@ class BayesMixin(torch.nn.Module):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
-			shape=(-1, self.d))
+			shape=(-1, self.d), check_parameter=self.check_data)
 
 		e = torch.empty(X.shape[0], self.k, device=self.device)
 		for i, d in enumerate(self.distributions):

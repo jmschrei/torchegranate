@@ -94,13 +94,19 @@ class FactorGraph(Distribution):
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
 
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
+
 	verbose: bool, optional
 		Whether to print the improvement and timings during training.
 	"""
 
 	def __init__(self, factors=None, marginals=None, edges=None, max_iter=20, 
-		tol=1e-6, inertia=0.0, frozen=False, verbose=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		tol=1e-6, inertia=0.0, frozen=False, check_data=True, verbose=False):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "FactorGraph"
 
 		self.factors = torch.nn.ModuleList([])
@@ -140,15 +146,12 @@ class FactorGraph(Distribution):
 
 		self._initialized = not factors
 
-
 	def _initialize(self, d):
 		self._initialized = True
 		super()._initialize(d)
 
-
 	def _reset_cache(self):
 		return
-
 
 	def add_factor(self, distribution):
 		"""Adds a distribution to the set of factors.
@@ -170,7 +173,6 @@ class FactorGraph(Distribution):
 
 		self._initialized = distribution._initialized
 
-
 	def add_marginal(self, distribution):
 		"""Adds a distribution to the set of marginals.
 
@@ -191,7 +193,6 @@ class FactorGraph(Distribution):
 		self._marginal_idxs[distribution] = len(self.marginals) - 1
 
 		self.d += 1
-
 
 	def add_edge(self, marginal, factor):
 		"""Adds an undirected edge to the set of edges.
@@ -221,8 +222,6 @@ class FactorGraph(Distribution):
 		self._factor_edges[f_idx].append(m_idx)
 		self._marginal_edges[m_idx].append(f_idx)
 
-
-	@torch.inference_mode()
 	def log_probability(self, X):
 		"""Calculate the log probability of each example.
 
@@ -242,7 +241,8 @@ class FactorGraph(Distribution):
 			The log probability of each example.
 		"""
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
+			check_parameter=self.check_data)
 		
 		logps = torch.zeros(X.shape[0], device=X.device, dtype=torch.float32)
 		for idxs, factor in zip(self._factor_edges, self.factors):
@@ -253,8 +253,6 @@ class FactorGraph(Distribution):
 
 		return logps
 
-
-	@torch.inference_mode()
 	def predict(self, X):
 		"""Infers the maximum likelihood value for each missing value.
 
@@ -289,8 +287,6 @@ class FactorGraph(Distribution):
 		y = [t.argmax(dim=1) for t in self.predict_proba(X)]
 		return torch.vstack(y).T.contiguous()
 
-
-	@torch.inference_mode()
 	def predict_proba(self, X):
 		"""Predict the probability of each variable given some evidence.
 
@@ -458,7 +454,6 @@ class FactorGraph(Distribution):
 
 		return current_marginals
 
-
 	def predict_log_proba(self, X):
 		"""Infers the probability of each category given the model and data.
 
@@ -506,7 +501,6 @@ class FactorGraph(Distribution):
 		"""
 
 		return [torch.log(t) for t in self.predict_proba(X)]
-		
 
 	def fit(self, X, sample_weight=None):
 		"""Fit the factors of the model to optionally weighted examples.
@@ -539,7 +533,6 @@ class FactorGraph(Distribution):
 		self.from_summaries()
 		return self
 
-
 	def summarize(self, X, sample_weight=None):
 		"""Extract the sufficient statistics from a batch of data.
 
@@ -570,12 +563,11 @@ class FactorGraph(Distribution):
 			return
 
 		X, sample_weight = super().summarize(X, sample_weight=sample_weight)
-		X = _check_parameter(X, "X", ndim=2)
+		X = _check_parameter(X, "X", ndim=2, check_parameter=self.check_data)
 
 		for i, factor in enumerate(self.factors):
 			factor.summarize(X[:, self._factor_edges[i]], 
 				sample_weight=sample_weight[:,i])
-
 
 	def from_summaries(self):
 		if self.frozen:

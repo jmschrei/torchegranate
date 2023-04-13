@@ -7,6 +7,7 @@ import pytest
 
 from torchegranate.sparse_hmm import SparseHMM
 from torchegranate.distributions import Exponential
+from torchegranate.distributions import Gamma
 
 from .distributions._utils import _test_initialization_raises_one_parameter
 from .distributions._utils import _test_initialization
@@ -64,17 +65,23 @@ def w():
 
 @pytest.fixture
 def model():
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
 	starts = [0.2, 0.8]
 	ends = [0.1, 0.1]
 
-	edges = [[0.1, 0.8],
-	         [0.3, 0.6]]
+	edges = [
+		[d1, d1, 0.1],
+	 	[d1, d2, 0.8],
+	 	[d2, d1, 0.3],
+	 	[d2, d2, 0.6]
+	 ]
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
-		random_state=0)
-	model.bake()
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=starts, 
+		ends=ends, random_state=0)
 	return model
+
 
 ###
 
@@ -85,34 +92,110 @@ def test_initialization():
 
 	assert model.inertia == 0.0
 	assert model.frozen == False
-
 	assert model.n_distributions == 2
-
-	assert_array_almost_equal(model.ends, numpy.log([0.5, 0.5]))
-	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
-	assert_array_almost_equal(model.edges, numpy.log([0.5, 0.5, 0.5, 0.5]))
 
 	assert_raises(AttributeError, getattr, model, "_xw_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
-	model.bake()
-	assert isinstance(model, SparseHMM)
+	assert model.starts is None
+	assert model.ends is None
+	assert model.edges is None
+
+
+def test_add_distribution():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = SparseHMM()
+	assert model.distributions == None
+	assert model.n_distributions == 0
+
+	model.add_distribution(d1)
+	assert model.distributions == [d1]
+	assert model.n_distributions == 1
+
+	model.add_distribution(d2)
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model = SparseHMM([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model.add_distribution(d1)
+	assert model.distributions == [d1, d2, d1]
+	assert model.n_distributions == 3
+
+
+def test_add_distributions():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = SparseHMM()
+	assert model.distributions == None
+	assert model.n_distributions == 0
+
+	model.add_distributions([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model = SparseHMM([d1, d2])
+	assert model.distributions == [d1, d2]
+	assert model.n_distributions == 2
+
+	model.add_distributions([d1, d2])
+	assert model.distributions == [d1, d2, d1, d2]
+	assert model.n_distributions == 4
+
+
+def test_add_start_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = SparseHMM([d1, d2])
+	model.add_edge(model.start, d1, 0.3)
+	model.add_edge(model.start, d2, 0.7)
+	assert_raises(ValueError, model._initialize)
+
+
+def test_add_end_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = SparseHMM([d1, d2])
+	model.add_edge(d1, model.end, 0.2)
+	model.add_edge(d2, model.end, 0.3)
+	assert_raises(ValueError, model._initialize)
+
+
+def test_add_edge():
+	d1 = Exponential()
+	d2 = Gamma()
+
+	model = SparseHMM([d1, d2])
+	model.add_edge(d1, d1, 0.2)
+	model.add_edge(d1, d2, 0.8)
+	model.add_edge(d2, d1, 0.3)
+	model.add_edge(d2, d2, 0.4)
+	model.add_edge(d2, model.end, 0.3)
+	model._initialize()
+
+	assert_array_almost_equal(model.edges, numpy.log([0.2, 0.8, 0.3, 0.4]))
+	assert_array_almost_equal(model.starts, numpy.log([0.5, 0.5]))
+	assert_array_almost_equal(model.ends, numpy.log([0.0, 0.3]))
 
 
 def test_initialization_raises():
-	d = [Exponential(), Exponential()]
+	d1 = Exponential()
+	d2  =Exponential()
+	d = [d1, d2]
 
 	assert_raises(ValueError, SparseHMM, d, edges=[0.2, 0.2, 0.6])
 	assert_raises(ValueError, SparseHMM, d, edges=[0.2, 1.0])
-	assert_raises(ValueError, SparseHMM, d, 
-		edges=[[-0.2, 0.9], [0.2, 0.8]])
-	assert_raises(ValueError, SparseHMM, d, 
-		edges=[[0.3, 1.1], [0.2, 0.8]])
-	assert_raises(ValueError, SparseHMM, d, 
-		edges=[[0.2, 0.6, 0.2], [0.2, 0.7, 0.1], [0.1, 0.3, 0.6]])
-	assert_raises(ValueError, SparseHMM, d, 
-		edges=[[[0.2, 0.8], [0.2, 0.8]]])
+	assert_raises(ValueError, SparseHMM, d, edges=[[-0.2, 0.9], [0.2, 0.8]])
+	assert_raises(ValueError, SparseHMM, d, edges=[[d1, 0.1, 0.1], 
+		[d1, 0.1, 0.1]])
 
 	assert_raises(ValueError, SparseHMM, d, starts=[0.1, 0.3])
 	assert_raises(ValueError, SparseHMM, d, starts=[0.1, 1.2])
@@ -144,9 +227,9 @@ def test_initialization_raises():
 def test_reset_cache(model, X):
 	model.summarize(X)
 	assert_array_almost_equal(model._xw_sum, 
-		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
 	model._reset_cache()
 	assert_array_almost_equal(model._xw_sum, [0., 0., 0., 0.])
@@ -155,11 +238,15 @@ def test_reset_cache(model, X):
 
 
 def test_initialize(X):
-	d = [Exponential(), Exponential()]
-	model = SparseHMM(d, random_state=0)
+	d1 = Exponential()
+	d2 = Exponential()
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	model = SparseHMM([d1, d2], random_state=0)
+	model.add_edge(model.start, d1, 0.3)
+	model.add_edge(model.start, d2, 0.7)
+	model.add_edge(d1, d1, 0.5)
+	model.add_edge(d1, d2, 0.5)
+	model.add_edge(d2, d2, 1.0)
 
 	assert model.d is None
 	assert model.n_distributions == 2
@@ -172,11 +259,9 @@ def test_initialize(X):
 	assert_raises(AttributeError, getattr, model, "_xw_starts_sum")
 	assert_raises(AttributeError, getattr, model, "_xw_ends_sum")
 
-	model.bake()
 	model._initialize(X)
 	assert model._initialized == True
 	assert model.d == 3
-	assert isinstance(model, SparseHMM)
 
 	assert d1._initialized == True
 	assert d2._initialized == True
@@ -226,16 +311,21 @@ def test_sample(model):
 
 
 def test_sample_length(model):
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
 	starts = [0.2, 0.8]
 	ends = [0.1, 0.1]
 
-	edges = [[0.1, 0.8],
-	         [0.3, 0.6]]
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
-		sample_length=3, random_state=0)
-	model.bake()
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+	
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=starts, 
+		ends=ends, sample_length=3, random_state=0)
 
 	X = model.sample(25)
 	assert max([len(x) for x in X]) <= 3
@@ -244,16 +334,21 @@ def test_sample_length(model):
 def test_sample_paths(model):
 	torch.manual_seed(0)
 
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
 	starts = [0.2, 0.8]
 	ends = [0.1, 0.1]
 
-	edges = [[0.4, 0.5],
-	         [0.6, 0.3]]
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=edges, starts=starts, ends=ends,
-		return_sample_paths=True, random_state=0)
-	model.bake()
+	edges = [
+		[d1, d1, 0.4],
+		[d1, d2, 0.5],
+		[d2, d1, 0.6],
+		[d2, d2, 0.3]
+	]
+	
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=starts, 
+		ends=ends, return_sample_paths=True, random_state=0)
 
 	X, path = model.sample(1)
 	assert_array_equal(path[0],
@@ -526,6 +621,8 @@ def test_predict_log_proba_raises(model, X):
 	if MAX_VALUE is not None:
 		assert_raises(ValueError, f, 
 			[[[MAX_VALUE+0.1 for i in range(model.d)] for j in range(4)]])
+
+
 ###
 
 
@@ -535,27 +632,27 @@ def test_partial_summarize(model, X):
 	model.summarize(X[:1])
 
 	assert_array_almost_equal(model._xw_sum,
-		[2.635347e-04, 1.430410e-01, 8.828942e-01, 2.973804e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 0.863595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876259, 0.123741])
+		[2.635347e-04, 1.430410e-01, 8.828942e-01, 2.973804e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 0.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876259, 0.123741], 4)
 
-	assert_array_almost_equal(d1._w_sum, [1.019563, 1.019563, 1.019563])
-	assert_array_almost_equal(d1._xw_sum, [2.765183, 1.149069, 0.006899])
+	assert_array_almost_equal(d1._w_sum, [1.019563, 1.019563, 1.019563], 4)
+	assert_array_almost_equal(d1._xw_sum, [2.765183, 1.149069, 0.006899], 4)
 
-	assert_array_almost_equal(d2._w_sum, [3.980435, 3.980435, 3.980435])
-	assert_array_almost_equal(d2._xw_sum, [4.234817, 4.85093 , 4.993101])	
+	assert_array_almost_equal(d2._w_sum, [3.980435, 3.980435, 3.980435], 4)
+	assert_array_almost_equal(d2._xw_sum, [4.234817, 4.85093 , 4.993101], 4)	
 
 	model.summarize(X[1:])
 	assert_array_almost_equal(model._xw_sum, 
-		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
-	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771])
-	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904])
+	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771], 4)
+	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904], 4)
 
-	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225])
-	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094])	
+	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225], 4)
+	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094], 4)	
 
 
 def test_summarize(model, X):
@@ -564,15 +661,15 @@ def test_summarize(model, X):
 	model.summarize(X)
 
 	assert_array_almost_equal(model._xw_sum, 
-		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736])
+		[2.666848e-04, 1.895243e+00, 2.635099e+00, 3.469392e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 1.863595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876264, 1.123736], 4)
 
-	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771])
-	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904])
+	assert_array_almost_equal(d1._w_sum, [2.771771, 2.771771, 2.771771], 4)
+	assert_array_almost_equal(d1._xw_sum, [5.403805, 2.901283, 0.006904], 4)
 
-	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225])
-	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094])	
+	assert_array_almost_equal(d2._w_sum, [7.228225, 7.228225, 7.228225], 4)
+	assert_array_almost_equal(d2._xw_sum, [10.596191,  8.098713, 11.993094], 4)	
 
 
 def test_summarize_weighted(model, X, w):
@@ -581,16 +678,16 @@ def test_summarize_weighted(model, X, w):
 	model.summarize(X, sample_weight=w)
 
 	assert_array_almost_equal(model._xw_sum, 
-		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729])
+		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729], 4)
 
-	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643])
+	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643], 4)
 	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
-		6.910709e-03])
+		6.910709e-03], 4)
 
-	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351])
-	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086])	
+	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351], 4)
+	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086], 4)	
 
 
 def test_summarize_raises(model, X, w):
@@ -617,7 +714,7 @@ def test_from_summaries(model, X):
 	assert_array_almost_equal(model.starts, [-2.685274, -0.07064])
 	assert_array_almost_equal(model.ends, [-1.151575, -1.861335])
 	assert_array_almost_equal(model.edges, 
-		[-9.248932, -0.380141, -1.009072, -0.734015])
+		[-9.248932, -0.380141, -1.009072, -0.734015], 4)
 
 	assert_array_almost_equal(d1.scales, [1.949585, 1.046725, 0.002491])
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
@@ -635,142 +732,160 @@ def test_from_summaries_weighted(model, X, w):
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
 
-	assert_array_almost_equal(model.starts, [-3.186049, -0.042213])
-	assert_array_almost_equal(model.ends, [-1.751398, -1.552713])
+	assert_array_almost_equal(model.starts, [-3.186049, -0.042213], 4)
+	assert_array_almost_equal(model.ends, [-1.751398, -1.552713], 4)
 	assert_array_almost_equal(model.edges, 
-		[-9.833524, -0.190658, -0.846142, -1.023709])
+		[-9.833524, -0.190658, -0.846142, -1.023709], 4)
 
 	assert_array_almost_equal(d1.scales, 
-		[1.749434e+00, 1.025649e+00, 1.368553e-03])
+		[1.749434e+00, 1.025649e+00, 1.368553e-03], 4)
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
 
-	assert_array_almost_equal(d2.scales, [1.647633, 1.076022, 1.842134])
+	assert_array_almost_equal(d2.scales, [1.647633, 1.076022, 1.842134], 4)
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
 def test_from_summaries_inertia(X):
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], inertia=0.3)
 	model.summarize(X)
 	model.from_summaries()
 
-	assert_array_almost_equal(model.starts, [-2.362523, -0.116391])
-	assert_array_almost_equal(model.ends, [-1.496878, -1.99371])
+	assert_array_almost_equal(model.starts, [-2.362523, -0.116391], 4)
+	assert_array_almost_equal(model.ends, [-1.496878, -1.99371], 4)
 	assert_array_almost_equal(model.edges, 
-		[-7.165028, -0.333042, -1.067542, -0.667058])
+		[-7.165028, -0.333042, -1.067542, -0.667058], 4)
 
-	assert_array_almost_equal(d1.scales, [1.949585, 1.046725, 0.002491])
+	assert_array_almost_equal(d1.scales, [1.949585, 1.046725, 0.002491], 4)
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
 
-	assert_array_almost_equal(d2.scales, [1.465946, 1.120429, 1.659203])
+	assert_array_almost_equal(d2.scales, [1.465946, 1.120429, 1.659203], 4)
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
-	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
-	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1], inertia=0.25) 
+	d2 = Exponential([1.5, 3.1, 2.2], inertia=0.83)
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], inertia=0.0)
 	model.summarize(X)
 	model.from_summaries()
 
-	assert_array_almost_equal(model.starts, [-2.685274, -0.07064])
-	assert_array_almost_equal(model.ends, [-1.151575, -1.861335])
+	assert_array_almost_equal(model.starts, [-2.685274, -0.07064], 4)
+	assert_array_almost_equal(model.ends, [-1.151575, -1.861335], 4)
 	assert_array_almost_equal(model.edges, 
-		[-9.248932, -0.380141, -1.009072, -0.734015])
+		[-9.248932, -0.380141, -1.009072, -0.734015], 4)
 
-	assert_array_almost_equal(d1.scales, [1.987189, 0.860044, 0.026868])
+	assert_array_almost_equal(d1.scales, [1.987189, 0.860044, 0.026868], 4)
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
 
-	assert_array_almost_equal(d2.scales, [1.494211, 2.763473, 2.108064])
+	assert_array_almost_equal(d2.scales, [1.494211, 2.763473, 2.108064], 4)
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
 def test_from_summaries_weighted_inertia(X, w):
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.3)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], inertia=0.3)
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
 
-	assert_array_almost_equal(model.starts, [-2.713066, -0.096492])
-	assert_array_almost_equal(model.ends, [-1.916754, -1.777675])
+	assert_array_almost_equal(model.starts, [-2.713066, -0.096492], 4)
+	assert_array_almost_equal(model.ends, [-1.916754, -1.777675], 4)
 	assert_array_almost_equal(model.edges, 
-		[-7.574241, -0.200404, -0.953492, -0.869843])
+		[-7.574241, -0.200404, -0.953492, -0.869843], 4)
 
 	assert_array_almost_equal(d1.scales, 
 		[1.749434e+00, 1.025649e+00, 1.368553e-03], 3)
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
 
-	assert_array_almost_equal(d2.scales, [1.647633, 1.076022, 1.842134])
+	assert_array_almost_equal(d2.scales, [1.647633, 1.076022, 1.842134], 3)
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
-	d = [Exponential([2.1, 0.3, 0.1], inertia=0.25), 
-	     Exponential([1.5, 3.1, 2.2], inertia=0.83)]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1], inertia=0.25) 
+	d2 = Exponential([1.5, 3.1, 2.2], inertia=0.83)
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], inertia=0.0)
 	model.summarize(X, sample_weight=w)
 	model.from_summaries()
 
-	assert_array_almost_equal(model.starts, [-3.186049, -0.042213])
-	assert_array_almost_equal(model.ends, [-1.751398, -1.552713])
+	assert_array_almost_equal(model.starts, [-3.186049, -0.042213], 4)
+	assert_array_almost_equal(model.ends, [-1.751398, -1.552713], 4)
 	assert_array_almost_equal(model.edges, 
-		[-9.833524, -0.190658, -0.846142, -1.023709])
+		[-9.833524, -0.190658, -0.846142, -1.023709], 4)
 
-	assert_array_almost_equal(d1.scales, [1.837075, 0.844237, 0.026026])
+	assert_array_almost_equal(d1.scales, [1.837075, 0.844237, 0.026026], 4)
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d1._xw_sum, [0., 0., 0.])
 
-	assert_array_almost_equal(d2.scales, [1.525098, 2.755924, 2.139163])
+	assert_array_almost_equal(d2.scales, [1.525098, 2.755924, 2.139163], 4)
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
 def test_from_summaries_frozen(model, X):
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], frozen=True)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], frozen=True)
 	model.summarize(X)
 	model.from_summaries()
 
 	assert_array_almost_equal(model.starts, [-1.609438, -0.223144])
 	assert_array_almost_equal(model.ends, [-2.302585, -2.302585])
 	assert_array_almost_equal(model.edges, 
-		[-2.302585, -0.223144, -1.203973, -0.510826])
+		[-2.302585, -0.223144, -1.203973, -0.510826], 4)
 
 	assert_array_almost_equal(d1.scales, [1.949585, 1.046725, 0.002491])
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
@@ -781,22 +896,25 @@ def test_from_summaries_frozen(model, X):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
-	d = [Exponential([2.1, 0.3, 0.1], frozen=True), 
-	     Exponential([1.5, 3.1, 2.2], frozen=True)]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], inertia=0.0)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1], frozen=True) 
+	d2 = Exponential([1.5, 3.1, 2.2], frozen=True)
+	
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
-
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], inertia=0.0)
 	model.summarize(X)
 	model.from_summaries()
 
 	assert_array_almost_equal(model.starts, [-2.685274, -0.07064])
 	assert_array_almost_equal(model.ends, [-1.151575, -1.861335])
 	assert_array_almost_equal(model.edges, 
-		[-9.248932, -0.380141, -1.009072, -0.734015])
+		[-9.248932, -0.380141, -1.009072, -0.734015], 4)
 
 	assert_array_almost_equal(d1.scales, [2.1, 0.3, 0.1])
 	assert_array_almost_equal(d1._w_sum, [0., 0., 0.])
@@ -810,15 +928,20 @@ def test_from_summaries_frozen(model, X):
 def test_fit(X):
 	X = torch.tensor(numpy.array(X) + 1)
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=1)
 	model.fit(X)
 	
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
-
 	assert_array_almost_equal(model.starts, [-1.489857e+01, -3.385568e-07], 4)
 	assert_array_almost_equal(model.ends, [-1.110725, -1.609444])
 	assert_array_almost_equal(model.edges, 
@@ -832,15 +955,20 @@ def test_fit(X):
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
-	model.fit(X)
-
 	
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=5)
+	model.fit(X)
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -859,15 +987,20 @@ def test_fit(X):
 def test_fit_weighted(X, w):
 	X = torch.tensor(numpy.array(X) + 1)
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=1)
-	model.bake()
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
+
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=1)
 	model.fit(X, sample_weight=w)
 	
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
-
 	assert_array_almost_equal(model.starts, [-1.5399e+01, -2.0519e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.732272, -1.609437])
 	assert_array_almost_equal(model.edges, 
@@ -881,15 +1014,19 @@ def test_fit_weighted(X, w):
 	assert_array_almost_equal(d2._w_sum, [0., 0., 0.])
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
-	model.fit(X, sample_weight=w)
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=5)
+	model.fit(X, sample_weight=w)
 
 	assert_array_almost_equal(model.starts, [-1.6093e+01, -1.0250e-07], 3)
 	assert_array_almost_equal(model.ends, [-1.469704, -1.609439])
@@ -918,7 +1055,9 @@ def test_fit_raises(model, X, w):
 	assert_raises(ValueError, model.fit, X[:len(X)-1], w)
 	assert_raises(ValueError, model.fit, X, w[:len(w)-1])
 
+
 ###
+
 
 def test_masked_log_probability(model, X, X_masked):
 	X = torch.tensor(numpy.array(X))
@@ -978,7 +1117,6 @@ def test_masked_forward(model, X, X_masked):
           [-15.9894, -14.2483]]], 4)
 
 
-
 def test_masked_backward(model, X, X_masked):
 	X = torch.tensor(numpy.array(X))
 	mask = torch.ones_like(X).type(torch.bool)
@@ -1021,7 +1159,7 @@ def test_masked_forward_backward(model, X, X_masked):
 	t, r, starts, ends, logp = model.forward_backward(X_)
 	assert_array_almost_equal(t,
 		[[2.635347e-04, 1.430410e-01, 8.828942e-01, 2.973804e+00],
-         [3.150036e-06, 1.752202e+00, 1.752205e+00, 4.955886e-01]])
+         [3.150036e-06, 1.752202e+00, 1.752205e+00, 4.955886e-01]], 4)
 
 	assert_array_almost_equal(r,
 		[[[-1.9921e+00, -1.4665e-01],
@@ -1050,7 +1188,7 @@ def test_masked_forward_backward(model, X, X_masked):
 	t, r, starts, ends, logp = model.forward_backward(X_masked)
 	assert_array_almost_equal(t,
 		[[0.041682, 0.643657, 1.405594, 1.90907 ],
-         [0.092079, 1.618498, 1.767671, 0.521754]])
+         [0.092079, 1.618498, 1.767671, 0.521754]], 4)
 
 	assert_array_almost_equal(r,
 		[[[ -2.1687,  -0.1214],
@@ -1179,16 +1317,16 @@ def test_masked_ones_summarize(model, X, w):
 	model.summarize(X_, sample_weight=w)
 
 	assert_array_almost_equal(model._xw_sum, 
-		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00])
-	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595])
-	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729])
+		[2.707798e-04, 4.173105e+00, 4.912965e+00, 4.113657e+00], 4)
+	assert_array_almost_equal(model._xw_starts_sum, [0.136405, 3.163595], 4)
+	assert_array_almost_equal(model._xw_ends_sum, [0.876271, 2.423729], 4)
 
-	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643])
+	assert_array_almost_equal(d1._w_sum, [5.049643, 5.049643, 5.049643], 4)
 	assert_array_almost_equal(d1._xw_sum, [8.834015e+00, 5.179160e+00, 
-		6.910696e-03])
+		6.910696e-03], 4)
 
-	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351])
-	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086])	
+	assert_array_almost_equal(d2._w_sum, [11.450351, 11.450351, 11.450351], 4)
+	assert_array_almost_equal(d2._xw_sum, [18.86598 , 12.320832, 21.093086], 4)	
 
 
 def test_masked_summarize(model, X, X_masked, w):
@@ -1223,7 +1361,7 @@ def test_masked_ones_from_summaries(model, X, w):
 	assert_array_almost_equal(model.starts, [-3.186049, -0.042213])
 	assert_array_almost_equal(model.ends, [-1.7514  , -1.552714])
 	assert_array_almost_equal(model.edges, 
-		[-9.833523, -0.190658, -0.846143, -1.023708])
+		[-9.833523, -0.190658, -0.846143, -1.023708], 4)
 
 	assert_array_almost_equal(d1.scales, 
 		[1.749434e+00, 1.025649e+00, 1.368553e-03])
@@ -1262,15 +1400,19 @@ def test_masked_fit(X, X_masked):
 	mask = torch.ones_like(X).type(torch.bool)
 	X_ = torch.masked.MaskedTensor(X, mask=mask)
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
-	model.fit(X_)
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=5)
+	model.fit(X_)
 
 	assert_array_almost_equal(model.starts, [-1.545504e+01, -1.940718e-07], 4)
 	assert_array_almost_equal(model.ends, [-0.758036, -1.609449])
@@ -1286,14 +1428,19 @@ def test_masked_fit(X, X_masked):
 	assert_array_almost_equal(d2._xw_sum, [0., 0., 0.])
 
 
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = SparseHMM(distributions=d, edges=[[0.1, 0.8], [0.3, 0.6]], 
-		starts=[0.2, 0.8], ends=[0.1, 0.1], max_iter=5)
-	model.bake()
-	model.fit(X_masked + 1)
+	d1 = Exponential([2.1, 0.3, 0.1])
+	d2 = Exponential([1.5, 3.1, 2.2])
 
-	d1 = model.distributions[0]
-	d2 = model.distributions[1]
+	edges = [
+		[d1, d1, 0.1],
+		[d1, d2, 0.8],
+		[d2, d1, 0.3],
+		[d2, d2, 0.6]
+	]
+
+	model = SparseHMM(distributions=[d1, d2], edges=edges, starts=[0.2, 0.8], 
+		ends=[0.1, 0.1], max_iter=5)
+	model.fit(X_masked + 1)
 
 	assert_array_almost_equal(model.starts, [-16.6664,   0.0000], 4)
 	assert_array_almost_equal(model.ends, [-0.9247, -1.7014], 4)

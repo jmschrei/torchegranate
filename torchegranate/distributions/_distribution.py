@@ -16,15 +16,18 @@ class Distribution(torch.nn.Module):
 	This distribution is inherited by all the other distributions.
 	"""
 
-	def __init__(self, inertia, frozen):
+	def __init__(self, inertia, frozen, check_data):
 		super(Distribution, self).__init__()
 		self._device = _cast_as_parameter([0.0])
 
 		_check_parameter(inertia, "inertia", min_value=0, max_value=1, ndim=0)
 		_check_parameter(frozen, "frozen", value_set=[True, False], ndim=0)
+		_check_parameter(check_data, "check_data", value_set=[True, False],
+			ndim=0)
 
 		self.register_buffer("inertia", _cast_as_tensor(inertia))
 		self.register_buffer("frozen", _cast_as_tensor(frozen))
+		self.register_buffer("check_data", _cast_as_tensor(check_data))
 
 		self._initialized = False
 
@@ -70,7 +73,8 @@ class Distribution(torch.nn.Module):
 			self._initialize(len(X[0]))
 
 		X = _cast_as_tensor(X)
-		_check_parameter(X, "X", ndim=2, shape=(-1, self.d))
+		_check_parameter(X, "X", ndim=2, shape=(-1, self.d), 
+			check_parameter=self.check_data)
 
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight), 
 			device=self.device)
@@ -82,8 +86,8 @@ class Distribution(torch.nn.Module):
 
 
 class ConditionalDistribution(Distribution):
-	def __init__(self, inertia, frozen):
-		super().__init__(inertia=inertia, frozen=frozen)
+	def __init__(self, inertia, frozen, check_data):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 
 	def marginal(self, dim):
 		raise NotImplementedError

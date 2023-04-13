@@ -57,11 +57,17 @@ class MarkovChain(Distribution):
 		If you want to freeze individual pameters, or individual values in those
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
+
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
 	"""
 
 	def __init__(self, distributions=None, k=None, n_categories=None, 
-		inertia=0.0, frozen=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		inertia=0.0, frozen=False, check_data=True):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "MarkovChain"
 
 		self.distributions = _check_parameter(distributions, "distributions",
@@ -170,7 +176,8 @@ class MarkovChain(Distribution):
 		"""
 
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+			check_parameter=self.check_data)
 		self.d = X.shape[1]
 
 		logps = self.distributions[0].log_probability(X[:, 0])
@@ -242,9 +249,11 @@ class MarkovChain(Distribution):
 		if not self._initialized:
 			self._initialize(len(X[0]))
 
-		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3)
+		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
+			check_parameter=self.check_data)
 		sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
-			"sample_weight", min_value=0, ndim=(1, 2))
+			"sample_weight", min_value=0, ndim=(1, 2), 
+			check_parameter=self.check_data)
 
 		if sample_weight is None:
 			sample_weight = torch.ones_like(X[:, 0])
@@ -254,7 +263,8 @@ class MarkovChain(Distribution):
 			sample_weight = sample_weight.expand(-1, X.shape[2])
 
 		_check_parameter(_cast_as_tensor(sample_weight), "sample_weight", 
-			min_value=0, ndim=2, shape=(X.shape[0], X.shape[2]))
+			min_value=0, ndim=2, shape=(X.shape[0], X.shape[2]), 
+			check_parameter=self.check_data)
 
 		self.distributions[0].summarize(X[:, 0], sample_weight=sample_weight)
 		for i, distribution in enumerate(self.distributions[1:-1]):

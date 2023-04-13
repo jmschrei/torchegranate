@@ -74,13 +74,20 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
 
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling. Default is True.
+
 	verbose: bool, optional
 		Whether to print the improvement and timings during training.
 	"""
 
 	def __init__(self, distributions, priors=None, init='random', max_iter=1000, 
-		tol=0.1, inertia=0.0, frozen=False, random_state=None, verbose=False):
-		super().__init__(inertia=inertia, frozen=frozen)
+		tol=0.1, inertia=0.0, frozen=False, random_state=None, check_data=True, 
+		verbose=False):
+		super().__init__(inertia=inertia, frozen=frozen, check_data=check_data)
 		self.name = "GeneralMixtureModel"
 
 		_check_parameter(distributions, "distributions", dtypes=(list, tuple, 
@@ -136,7 +143,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 				device=self.device).expand(X.shape[0], 1)
 		else:
 			sample_weight = _check_parameter(_cast_as_tensor(sample_weight), 
-				"sample_weight", min_value=0.)
+				"sample_weight", min_value=0., check_parameter=self.check_data)
 
 		model = KMeans(self.k, init=self.init, max_iter=3, 
 			random_state=self.random_state)

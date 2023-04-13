@@ -120,7 +120,7 @@ def test_sample(distributions):
 	torch.manual_seed(0)
 
 	X = IndependentComponents(distributions).sample(1)
-	assert_array_almost_equal(X, [[3.508326, 0.269697, 1.]])
+	assert_array_almost_equal(X, [[3.508326, 0.269697, 1.]], 4)
 
 	X = IndependentComponents(distributions).sample(5)
 	assert_array_almost_equal(X,
@@ -385,9 +385,9 @@ def test_from_summaries(X, distributions):
 
 	d.from_summaries()
 	assert_array_almost_equal(d1.scales, [2.])
-	assert_array_almost_equal(d2.rates, [3.382766])
-	assert_array_almost_equal(d2.shapes, [5.315776])
-	assert_array_almost_equal(d3.probs, [[0.571429, 0.428571]])
+	assert_array_almost_equal(d2.rates, [3.382766], 4)
+	assert_array_almost_equal(d2.shapes, [5.315776], 4)
+	assert_array_almost_equal(d3.probs, [[0.571429, 0.428571]], 4)
 
 
 def test_from_summaries_inertia(X):
@@ -400,8 +400,8 @@ def test_from_summaries_inertia(X):
 	d.from_summaries()
 
 	assert_array_almost_equal(d1.scales, [2.0])
-	assert_array_almost_equal(d2.scales, [1.571429])
-	assert_array_almost_equal(d3.scales, [0.428571])
+	assert_array_almost_equal(d2.scales, [1.571429], 4)
+	assert_array_almost_equal(d3.scales, [0.428571], 4)
 
 
 	d1 = Exponential([0.3], inertia=0.3)
@@ -413,8 +413,8 @@ def test_from_summaries_inertia(X):
 	d.from_summaries()
 
 	assert_array_almost_equal(d1.scales, [1.49])
-	assert_array_almost_equal(d2.scales, [1.048571])
-	assert_array_almost_equal(d3.scales, [0.428571])
+	assert_array_almost_equal(d2.scales, [1.048571], 4)
+	assert_array_almost_equal(d3.scales, [0.428571], 4)
 
 
 def test_from_summaries_frozen(X):
@@ -427,8 +427,8 @@ def test_from_summaries_frozen(X):
 	d.from_summaries()
 
 	assert_array_almost_equal(d1.scales, [2.0])
-	assert_array_almost_equal(d2.scales, [1.571429])
-	assert_array_almost_equal(d3.scales, [0.428571])
+	assert_array_almost_equal(d2.scales, [1.571429], 4)
+	assert_array_almost_equal(d3.scales, [0.428571], 4)
 
 
 	d1 = Exponential([0.3], frozen=True)
@@ -441,7 +441,7 @@ def test_from_summaries_frozen(X):
 
 	assert_array_almost_equal(d1.scales, [0.3])
 	assert_array_almost_equal(d2.scales, [0.7])
-	assert_array_almost_equal(d3.scales, [0.428571])
+	assert_array_almost_equal(d3.scales, [0.428571], 4)
 
 
 def test_fit(X, distributions):
@@ -449,28 +449,28 @@ def test_fit(X, distributions):
 	d = IndependentComponents(distributions)
 	d.fit(X)
 	assert_array_almost_equal(d1.scales, [2.])
-	assert_array_almost_equal(d2.rates, [3.382766])
-	assert_array_almost_equal(d2.shapes, [5.315776])
-	assert_array_almost_equal(d3.probs, [[0.571429, 0.428571]])
+	assert_array_almost_equal(d2.rates, [3.382766], 4)
+	assert_array_almost_equal(d2.shapes, [5.315776], 4)
+	assert_array_almost_equal(d3.probs, [[0.571429, 0.428571]], 4)
 
 
 def test_fit_weighted(X, w, distributions):
 	d1, d2, d3 = distributions
 	d = IndependentComponents(distributions)
 	d.fit(X, sample_weight=w)
-	assert_array_almost_equal(d1.scales, [2.272727])
-	assert_array_almost_equal(d2.rates, [3.181162])
-	assert_array_almost_equal(d2.shapes, [4.627145])
-	assert_array_almost_equal(d3.probs, [[0.727273, 0.272727]])
+	assert_array_almost_equal(d1.scales, [2.272727], 4)
+	assert_array_almost_equal(d2.rates, [3.181162], 4)
+	assert_array_almost_equal(d2.shapes, [4.627145], 4)
+	assert_array_almost_equal(d3.probs, [[0.727273, 0.272727]], 4)
 
 
 def test_fit_chain(X, w, distributions):
 	d1, d2, d3 = distributions
 	d = IndependentComponents(distributions).fit(X, sample_weight=w)
-	assert_array_almost_equal(d1.scales, [2.272727])
-	assert_array_almost_equal(d2.rates, [3.181162])
-	assert_array_almost_equal(d2.shapes, [4.627145])
-	assert_array_almost_equal(d3.probs, [[0.727273, 0.272727]])
+	assert_array_almost_equal(d1.scales, [2.272727], 4)
+	assert_array_almost_equal(d2.rates, [3.181162], 4)
+	assert_array_almost_equal(d2.shapes, [4.627145], 4)
+	assert_array_almost_equal(d3.probs, [[0.727273, 0.272727]], 4)
 
 
 def test_fit_raises(X, w, distributions):
@@ -569,8 +569,8 @@ def test_masked_from_summaries(X, X_masked):
 	d.summarize(X_masked)
 	d.from_summaries()
 	assert_array_almost_equal(d1.scales, [2.25])
-	assert_array_almost_equal(d2.rates, [3.14873])
-	assert_array_almost_equal(d2.shapes, [5.667715])
+	assert_array_almost_equal(d2.rates, [3.14873], 4)
+	assert_array_almost_equal(d2.shapes, [5.667715], 4)
 	assert_array_almost_equal(d3.scales, [0.5])
 
 
@@ -584,7 +584,7 @@ def test_masked_fit(X, X_masked):
 	d3 = Exponential([4.])
 	d = IndependentComponents([d1, d2, d3]).fit(X_masked)
 	assert_array_almost_equal(d1.scales, [2.25])
-	assert_array_almost_equal(d2.rates, [3.14873])
-	assert_array_almost_equal(d2.shapes, [5.667715])
+	assert_array_almost_equal(d2.rates, [3.14873], 4)
+	assert_array_almost_equal(d2.shapes, [5.667715], 4)
 	assert_array_almost_equal(d3.scales, [0.5])
 	

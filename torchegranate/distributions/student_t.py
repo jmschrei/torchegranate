@@ -62,10 +62,16 @@ class StudentT(Normal):
 		If you want to freeze individual pameters, or individual values in those
 		parameters, you must modify the `frozen` attribute of the tensor or
 		parameter directly. Default is False.
+
+	check_data: bool, optional
+		Whether to check properties of the data and potentially recast it to
+		torch.tensors. This does not prevent checking of parameters but can
+		slightly speed up computation when you know that your inputs are valid.
+		Setting this to False is also necessary for compiling.
 	"""
 
 	def __init__(self, dofs, means=None, covs=None, covariance_type='diag', 
-		min_cov=None, inertia=0.0, frozen=False):
+		min_cov=None, inertia=0.0, frozen=False, check_data=True):
 		self.name = "StudentT"
 
 		dofs = _check_parameter(_cast_as_tensor(dofs), "dofs", min_value=1,
@@ -73,7 +79,8 @@ class StudentT(Normal):
 		self.dofs = dofs
 
 		super().__init__(means=means, covs=covs, min_cov=min_cov,
-			covariance_type=covariance_type, inertia=inertia, frozen=frozen)
+			covariance_type=covariance_type, inertia=inertia, frozen=frozen,
+			check_data=check_data)
 
 		del self.dofs
 
@@ -144,7 +151,7 @@ class StudentT(Normal):
 		"""
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
-			shape=(-1, self.d))
+			shape=(-1, self.d), check_parameter=self.check_data)
 
 		t = (X - self.means) ** 2 / self.covs
 		return torch.sum(self._lgamma_dofsp1 - self._lgamma_dofs - \
