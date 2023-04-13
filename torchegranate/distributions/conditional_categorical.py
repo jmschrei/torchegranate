@@ -151,7 +151,8 @@ class ConditionalCategorical(ConditionalDistribution):
 			dtype=torch.float32), "sample_weight", min_value=0, ndim=(1, 2))
 
 		if sample_weight is None:
-			sample_weight = torch.ones(X[:, 0].shape[0], X[:, 0].shape[-1], dtype=self.probs[0].dtype)
+			sample_weight = torch.ones(X[:, 0].shape[0], X[:, 0].shape[-1], 
+				dtype=self.probs[0].dtype)
 		elif len(sample_weight.shape) == 1: 
 			sample_weight = sample_weight.reshape(-1, 1).expand(-1, X.shape[2])
 		elif sample_weight.shape[1] == 1 and self.d > 1:

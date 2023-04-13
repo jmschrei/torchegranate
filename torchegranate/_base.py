@@ -276,7 +276,7 @@ class _BaseHMM(Distribution, GraphMixin):
 				sample_weight = _check_parameter(_cast_as_tensor(
 					sample_weight).reshape(-1, 1), "sample_weight", 
 					min_value=0., ndim=1, shape=(len(X),), 
-					check_parameter=check_data).reshape(-1, 1)
+					check_parameter=self.check_data).reshape(-1, 1)
 
 			y_hat = KMeans(self.n_distributions, init=self.init, max_iter=1, 
 				random_state=self.random_state).fit_predict(X, 
@@ -571,7 +571,7 @@ class _BaseHMM(Distribution, GraphMixin):
 				shape=(emissions.shape[0],), 
 				check_parameter=self.check_data).reshape(-1, 1)
 
-		if not self._initialized and y is None:
+		if not self._initialized:
 			self._initialize(X, sample_weight=sample_weight)
 
 		return X, emissions, priors, sample_weight
