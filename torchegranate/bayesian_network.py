@@ -13,8 +13,6 @@ from ._utils import _update_parameter
 from ._utils import _check_parameter
 from ._utils import _reshape_weights
 
-from ._base import GraphMixin
-
 from .distributions._distribution import Distribution
 from .distributions import Categorical
 from .distributions import JointCategorical

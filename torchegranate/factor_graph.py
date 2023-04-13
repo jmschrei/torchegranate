@@ -13,7 +13,6 @@ from ._utils import _reshape_weights
 from .distributions._distribution import Distribution
 from .distributions._distribution import ConditionalDistribution
 
-from ._base import GraphMixin
 from .distributions import Categorical
 from .distributions import JointCategorical
 
