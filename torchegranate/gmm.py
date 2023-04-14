@@ -310,7 +310,7 @@ class GeneralMixtureModel(BayesMixin, Distribution):
 		sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight, 
 			dtype=torch.float32), device=self.device)
 
-		e = self._emission_matrix(X, y=y)
+		e = self._emission_matrix(X)
 		logp = torch.logsumexp(e, dim=1, keepdims=True)
 		y = torch.exp(e - logp)
 
