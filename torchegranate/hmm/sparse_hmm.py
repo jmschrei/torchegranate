@@ -377,12 +377,12 @@ class SparseHMM(_BaseHMM):
 			The log probabilities calculated by the forward algorithm.
 		"""
 
-		emissions, priors = _check_inputs(self, X, emissions, priors)
+		emissions = _check_inputs(self, X, emissions, priors)
 		n, l, _ = emissions.shape
 
 		f = torch.full((l, n, self.n_distributions), -inf, dtype=torch.float32, 
 			device=self.device)
-		f[0] = self.starts + emissions[:, 0] + priors[:, 0]
+		f[0] = self.starts + emissions[:, 0]
 
 		for i in range(1, l):
 			p = f[i-1, :, self._edge_idx_starts]
@@ -394,7 +394,7 @@ class SparseHMM(_BaseHMM):
 			z = torch.zeros_like(f[i])
 			z.scatter_add_(1, self._edge_idx_ends.expand(n, -1), p)
 
-			f[i] = alpha + torch.log(z) + emissions[:, i] + priors[:, i]
+			f[i] = alpha + torch.log(z) + emissions[:, i]
 
 		f = f.permute(1, 0, 2)
 		return f
@@ -440,7 +440,7 @@ class SparseHMM(_BaseHMM):
 			The log probabilities calculated by the backward algorithm.
 		"""
 
-		emissions, priors = _check_inputs(self, X, emissions, priors)
+		emissions = _check_inputs(self, X, emissions, priors)
 		n, l, _ = emissions.shape
 
 		b = torch.full((l, n, self.n_distributions), -inf, dtype=torch.float32,
@@ -449,8 +449,7 @@ class SparseHMM(_BaseHMM):
 
 		for i in range(l-2, -1, -1):
 			p = b[i+1, :, self._edge_idx_ends]
-			p += emissions[:, i+1, self._edge_idx_ends] + priors[:, i+1, 
-				self._edge_idx_ends]
+			p += emissions[:, i+1, self._edge_idx_ends]
 			p += self._edge_log_probs.expand(n, -1)
 
 			alpha = torch.max(p, dim=1, keepdims=True).values
@@ -529,20 +528,20 @@ class SparseHMM(_BaseHMM):
 			The log probabilities of each sequence given the model.
 		"""
 
-		emissions, priors = _check_inputs(self, X, emissions, priors)
+		emissions = _check_inputs(self, X, emissions, priors)
 		n, l, _ = emissions.shape
 
-		f = self.forward(emissions=emissions, priors=priors)
-		b = self.backward(emissions=emissions, priors=priors)
+		f = self.forward(emissions=emissions)
+		b = self.backward(emissions=emissions)
 
 		logp = torch.logsumexp(f[:, -1] + self.ends, dim=1)
 
 		t = f[:, :-1, self._edge_idx_starts] + b[:, 1:, self._edge_idx_ends]
-		t += emissions[:, 1:, self._edge_idx_ends] + priors[:, 1:, self._edge_idx_ends]
+		t += emissions[:, 1:, self._edge_idx_ends]
 		t += self._edge_log_probs.expand(n, l-1, -1)
 		t = torch.exp(torch.logsumexp(t, dim=1).T - logp).T
 
-		starts = self.starts + emissions[:, 0] + priors[:, 0] + b[:, 0]
+		starts = self.starts + emissions[:, 0] + b[:, 0]
 		starts = torch.exp(starts.T - torch.logsumexp(starts, dim=-1)).T
 
 		ends = self.ends + f[:, -1]
@@ -589,11 +588,10 @@ class SparseHMM(_BaseHMM):
 			by a component, not gives a target. Default is None.
 		"""
 
-		X, emissions, priors, sample_weight = super().summarize(X, 
+		X, emissions, sample_weight = super().summarize(X, 
 			sample_weight=sample_weight, emissions=emissions, priors=priors)
 
-		t, r, starts, ends, logps = self.forward_backward(emissions=emissions, 
-			priors=priors)
+		t, r, starts, ends, logps = self.forward_backward(emissions=emissions)
 
 		self._xw_starts_sum += torch.sum(starts * sample_weight, dim=0)
 		self._xw_ends_sum += torch.sum(ends * sample_weight, dim=0)

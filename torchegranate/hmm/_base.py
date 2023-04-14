@@ -33,11 +33,10 @@ def _check_inputs(model, X, emissions, priors):
 
 	priors = _check_parameter(_cast_as_tensor(priors), "priors", ndim=3,
 		shape=(n, k, model.n_distributions))
-	if priors is None:
-		priors = torch.zeros(1, dtype=emissions.dtype, 
-			device=model.device).expand_as(emissions)
+	if priors is not None:
+		emissions += torch.log(priors)
 
-	return emissions, priors
+	return emissions
 
 
 class Silent(Distribution):
@@ -586,7 +585,7 @@ class _BaseHMM(Distribution):
 
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
 			shape=(-1, -1, self.d), check_parameter=self.check_data)
-		emissions, priors = _check_inputs(self, X, emissions, priors)
+		emissions = _check_inputs(self, X, emissions, priors)
 		
 		if sample_weight is None:
 			sample_weight = torch.ones(1, device=self.device).expand(
@@ -600,7 +599,7 @@ class _BaseHMM(Distribution):
 		if not self._initialized:
 			self._initialize(X, sample_weight=sample_weight)
 
-		return X, emissions, priors, sample_weight
+		return X, emissions, sample_weight
 
 	def from_summaries(self):
 		"""Update the model parameters given the extracted statistics.
