@@ -21,20 +21,10 @@ def _check_inputs(model, X, emissions, priors):
 	if X is None and emissions is None:
 		raise ValueError("Must pass in one of `X` or `emissions`.")
 
-	X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
-		shape=(-1, -1, model.d))
-	n = X.shape[0] if X is not None else -1
-	k = X.shape[1] if X is not None else -1
-
 	emissions = _check_parameter(_cast_as_tensor(emissions), "emissions", 
-		ndim=3, shape=(n, k, model.n_distributions))
+		ndim=3)
 	if emissions is None:
-		emissions = model._emission_matrix(X)
-
-	priors = _check_parameter(_cast_as_tensor(priors), "priors", ndim=3,
-		shape=(n, k, model.n_distributions))
-	if priors is not None:
-		emissions += torch.log(priors)
+		emissions = model._emission_matrix(X, priors=priors)
 
 	return emissions
 
@@ -243,7 +233,7 @@ class _BaseHMM(Distribution):
 		self._initialized = True
 		self._reset_cache()
 
-	def _emission_matrix(self, X):
+	def _emission_matrix(self, X, priors=None):
 		"""Return the emission/responsibility matrix.
 
 		This method returns the log probability of each example under each
@@ -256,6 +246,17 @@ class _BaseHMM(Distribution):
 		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
 			A set of examples to evaluate. 
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 	
 		Returns
 		-------
@@ -266,14 +267,18 @@ class _BaseHMM(Distribution):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=3, 
 			shape=(-1, -1, self.d), check_parameter=self.check_data)
 
-		if not self._initialized:
-			self._initialize()
-
 		n, k, _ = X.shape
 		X = X.reshape(n*k, self.d)
 
-		e = torch.empty((k, self.n_distributions, n), dtype=self.dtype, 
-			requires_grad=False, device=self.device)
+		priors = _check_parameter(_cast_as_tensor(priors), "priors",
+			ndim=3, shape=(n, k, self.k), min_value=0.0, max_value=1.0, 
+			value_sum=1.0, value_sum_dim=-1, check_parameter=self.check_data)
+
+		if not self._initialized:
+			self._initialize()
+
+		e = torch.empty((k, self.k, n), dtype=self.dtype, requires_grad=False, 
+			device=self.device)
 		
 		for i, node in enumerate(self.distributions):
 			logp = node.log_probability(X)
@@ -282,7 +287,16 @@ class _BaseHMM(Distribution):
 
 			e[:, i] = logp.reshape(n, k).T
 
-		return e.permute(2, 0, 1)
+		e = e.permute(2, 0, 1)
+
+		if priors is not None:
+			e += torch.log(priors)
+
+		return e
+
+	@property
+	def k(self):
+		return len(self.distributions) if self.distributions is not None else 0
 
 	@property
 	def n_distributions(self):
@@ -354,6 +368,34 @@ class _BaseHMM(Distribution):
 			self.edges = []
 
 		self.edges.append((start, end, probability))
+
+	def probability(self, X, priors=None):
+		"""Calculate the probability of each example.
+
+		This method calculates the probability of each example given the
+		parameters of the distribution. The examples must be given in a 3D
+		format.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to evaluate.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, length, self.d)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities).
+
+
+		Returns
+		-------
+		prob: torch.Tensor, shape=(-1,)
+			The probability of each example.
+		"""
+
+		return torch.exp(self.log_probability(X, priors=priors))
 
 	def log_probability(self, X, priors=None):
 		"""Calculate the log probability of each example.
