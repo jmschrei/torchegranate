@@ -16,6 +16,7 @@ from .distributions._utils import _test_efd_from_summaries
 from .distributions._utils import _test_raises
 
 from nose.tools import assert_raises
+from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
 
 
@@ -62,240 +63,186 @@ def w():
 
 
 @pytest.fixture
-def y():
-	y_ = torch.tensor([0, 0, -1, 1, -1, -1, -1, -1, 1, -1, -1])
-	return torch.masked.MaskedTensor(y_, mask=y_ != -1)
+def priors():
+	return torch.tensor(numpy.array([
+		[0.5, 0.5],
+	    [0.5, 0.5],
+	    [0.5, 0.5],
+	    [0.0, 1.0],
+	    [0.5, 0.5],
+	    [0.3, 0.7],
+	    [0.6, 0.4],
+	    [0.5, 0.5],
+	    [0.0, 1.0],
+	    [1.0, 0.0],
+	    [0.5, 0.5]
+	]))
 
 
 @pytest.fixture
-def model():
+def gmm():
 	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
 	return GeneralMixtureModel(d, priors=[0.7, 0.3])
 
 
+@pytest.fixture
+def hmm():
+	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
+	return DenseHMM(d, edges=[[0.8, 0.2], [0.4, 0.6]], starts=[0.4, 0.6])
+
+
 ###
 
-'''
-def test_emission_matrix(model, X, y):
-	e = model._emission_matrix(X)
-	assert_array_almost_equal(e, 
-		[[ -4.7349,  -4.8411],
-         [ -7.5921,  -3.9838],
-         [-21.4016,  -5.4276],
-         [-25.2111,  -6.4169],
-         [ -2.3540,  -5.8519],
-         [-43.3063,  -9.0034],
-         [ -1.8778,  -5.1852],
-         [-18.0682,  -5.1051],
-         [ -1.4016,  -4.5185],
-         [-14.2587,  -4.6290],
-         [  2.4079,  -3.5293]], 4)
 
-	ey = model._emission_matrix(X, y=y)
-	assert_array_almost_equal(ey, 
-		[[       0,     -inf],
-         [       0,     -inf],
-         [-21.4016,  -5.4276],
-         [    -inf,        0],
-         [ -2.3540,  -5.8519],
-         [-43.3063,  -9.0034],
-         [ -1.8778,  -5.1852],
-         [-18.0682,  -5.1051],
-         [    -inf,        0],
-         [-14.2587,  -4.6290],
-         [  2.4079,  -3.5293]], 4)
+def _test_raises(func, X, priors):
+	assert_raises(ValueError, func, X, priors+1)
+	assert_raises(ValueError, func, X, priors-1)
+	assert_raises(ValueError, func, X, priors/2.0)
+	assert_raises(ValueError, func, X, priors[:5])
+	assert_raises(ValueError, func, X[:5], priors)
+	assert_raises(ValueError, func, X, priors[:,0])
+	assert_raises(ValueError, func, X, priors[:, :1])
 
 
-def test_emission_matrix_raises(model, X, y):
-	assert_raises(ValueError, model._emission_matrix, X, y+1)
-	assert_raises(ValueError, model._emission_matrix, X, y-1)
-	assert_raises(ValueError, model._emission_matrix, X, y[:5])
-	assert_raises(ValueError, model._emission_matrix, X[:5], y)
+def test_gmm_emission_matrix(gmm, X, priors):
+	y_hat = gmm._emission_matrix(X)
+	assert_array_almost_equal(y_hat, [
+		[ -4.7349,  -4.8411],
+        [ -7.5921,  -3.9838],
+        [-21.4016,  -5.4276],
+        [-25.2111,  -6.4169],
+        [ -2.3540,  -5.8519],
+        [-43.3063,  -9.0034],
+        [ -1.8778,  -5.1852],
+        [-18.0682,  -5.1051],
+        [ -1.4016,  -4.5185],
+        [-14.2587,  -4.6290],
+        [  2.4079,  -3.5293]], 4)
 
-	y = torch.randint(2, size=(len(X), 3))
-	mask = torch.randint(2, size=(len(X), 3)).type(torch.bool)
-	y = torch.masked.MaskedTensor(y, mask=mask)
-	assert_raises(ValueError, model._emission_matrix, X, y)
-
-
-def test_partial_summarize(model, X, y):
-	model.summarize(X[:4], y=y[:4])
-	assert_array_almost_equal(model._w_sum, [2, 2])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[2, 2, 2])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[1, 2, 1])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[2, 2, 2])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[3, 3, 4])
-
-	model.summarize(X[4:], y=y[4:])
-	assert_array_almost_equal(model._w_sum, [4.932748, 6.067252])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[4.932748, 4.932748, 4.932748])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[5.841254, 3.935443, 1.000071])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[6.067252, 6.067252, 6.067252])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[10.158746,  7.064557, 10.999929])
+	y_hat = gmm._emission_matrix(X, priors=priors)
+	assert_array_almost_equal(y_hat, [
+		[ -5.4281,  -5.5343],
+        [ -8.2852,  -4.6770],
+        [-22.0947,  -6.1208],
+        [    -inf,  -6.4169],
+        [ -3.0471,  -6.5450],
+        [-44.5103,  -9.3601],
+        [ -2.3886,  -6.1015],
+        [-18.7614,  -5.7982],
+        [    -inf,  -4.5185],
+        [-14.2587,     -inf],
+        [  1.7148,  -4.2224]], 4)
 
 
-def test_full_summarize(model, X, y):
-	model.summarize(X)
-	assert_array_almost_equal(model._w_sum, [4.443249, 6.556751])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[4.443249, 4.443249, 4.443249])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[6.32537 , 3.946088, 0.026456])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[6.556752, 6.556752, 6.556752])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[9.674629,  7.053912, 11.973544])
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, priors=[0.7, 0.3])
-	model.summarize(X, y=y)
-	assert_array_almost_equal(model._w_sum, [4.932748, 6.067252])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[4.932748, 4.932748, 4.932748])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[5.841254, 3.935443, 1.000071])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[6.067252, 6.067252, 6.067252])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[10.158746,  7.064557, 10.999929])
+def test_gmm_emission_matrix_raises(gmm, X, priors):
+	_test_raises(gmm._emission_matrix, X, priors)
 
 
-def test_summarize_raises(model, X, y):
-	assert_raises(ValueError, model.summarize, X, None, y+1)
-	assert_raises(ValueError, model.summarize, X, None, y-1)
-	assert_raises(ValueError, model.summarize, X, None, y[:5])
-	assert_raises(ValueError, model.summarize, X[:5], None, y)
+def test_gmm_probability(gmm, X, priors):
+	y_hat = gmm.probability(X)
+	assert_array_almost_equal(y_hat, numpy.exp([-4.0935, -3.9571, -5.4276, 
+		-6.4169, -2.3241, -9.0034, -1.8418, -5.1051, -1.3582, -4.6289,  
+		2.4106]), 3)
 
-	y = torch.randint(2, size=(len(X), 3))
-	mask = torch.randint(2, size=(len(X), 3)).type(torch.bool)
-	y = torch.masked.MaskedTensor(y, mask=mask)
-	assert_raises(ValueError, model.summarize, X, None, y)
-
-
-def test_fit(X, y):
-	d = [Exponential([2.1, 0.3, 1.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, max_iter=1)
-	model.fit(X, y=y)
-
-	assert_array_almost_equal(model._w_sum, [0., 0.])
-	assert_array_almost_equal(model.priors, [0.491916, 0.508084])
-	assert_array_almost_equal(model._log_priors, numpy.log(
-		[0.491916, 0.508084]))
+	y_hat = gmm.probability(X, priors=priors)
+	assert_array_almost_equal(y_hat, [8.3407e-03, 9.5592e-03, 2.1967e-03, 
+		1.6337e-03, 4.8933e-02, 8.6094e-05, 9.3998e-02, 3.0330e-03, 
+		1.0905e-02, 6.4197e-07, 5.5702e+00], 3)	
 
 
-	d = [Exponential([2.1, 0.3, 1.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, max_iter=5)
-	model.fit(X, y=y)
-
-	assert_array_almost_equal(model._w_sum, [0., 0.])
-	assert_array_almost_equal(model.priors, [0.470019, 0.529981])
-	assert_array_almost_equal(model._log_priors, numpy.log(
-		[0.470019, 0.529981]))
+def test_gmm_probability_raises(gmm, X, priors):
+	_test_raises(gmm.probability, X, priors)
 
 
-def test_fit_weighted(X, w, y):
-	d = [Exponential([2.1, 0.3, 1.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, max_iter=1)
-	model.fit(X, sample_weight=w, y=y)
+def test_gmm_log_probability(gmm, X, priors):
+	y_hat = gmm.log_probability(X)
+	assert_array_almost_equal(y_hat, [-4.0935, -3.9571, -5.4276, -6.4169, 
+		-2.3241, -9.0034, -1.8418, -5.1051, -1.3582, -4.6289,  2.4106], 4)
 
-	assert_array_almost_equal(model._w_sum, [0., 0.])
-	assert_array_almost_equal(model.priors, [0.533468, 0.466532])
-	assert_array_almost_equal(model._log_priors, numpy.log(
-		[0.533468, 0.466532]))
-
-
-	d = [Exponential([2.1, 0.3, 1.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, max_iter=5)
-	model.fit(X, sample_weight=w, y=y)
-
-	assert_array_almost_equal(model._w_sum, [0., 0.])
-	assert_array_almost_equal(model.priors, [0.665037, 0.334963])
-	assert_array_almost_equal(model._log_priors, numpy.log(
-		[0.665037, 0.334963]))
+	y_hat = gmm.log_probability(X, priors=priors)
+	assert_array_almost_equal(y_hat, [-4.7866, -4.6503, -6.1208, -6.4169,
+		-3.0173, -9.3601, -2.3645, -5.7982, -4.5185, -14.2587, 1.7174], 4)	
 
 
-def test_masked_emission_matrix(model, X, X_masked, y):
-	X = torch.tensor(numpy.array(X))
-	mask = torch.ones_like(X).type(torch.bool)
-	X_ = torch.masked.MaskedTensor(X, mask=mask)
-	e = model._emission_matrix(X_, y=y)
-	assert_array_almost_equal(e, 
-		[[       0,     -inf],
-         [       0,     -inf],
-         [-21.4016,  -5.4276],
-         [    -inf,        0],
-         [ -2.3540,  -5.8519],
-         [-43.3063,  -9.0034],
-         [ -1.8778,  -5.1852],
-         [-18.0682,  -5.1051],
-         [    -inf,        0],
-         [-14.2587,  -4.6290],
-         [  2.4079,  -3.5293]], 4)
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d)
-	e = model._emission_matrix(X_masked, y=y)
-	assert_array_almost_equal(e, 
-		[[  0.0000,     -inf],
-         [  0.0000,     -inf],
-         [ -0.6931,  -0.6931],
-         [    -inf,   0.0000],
-         [ -2.8225,  -2.1471],
-         [-43.6428,  -8.4926],
-         [ -0.6931,  -0.6931],
-         [-19.6087,  -3.4628],
-         [    -inf,   0.0000],
-         [-14.5952,  -4.1182],
-         [  0.8675,  -1.8871]], 4)
-	
-
-def test_masked_summarize(model, X, X_masked, w, y):
-	X = torch.tensor(numpy.array(X))
-	mask = torch.ones_like(X).type(torch.bool)
-	X_ = torch.masked.MaskedTensor(X, mask=mask)
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, priors=[0.7, 0.3])
-	model.summarize(X_, sample_weight=w, y=y)
-	assert_array_almost_equal(model._w_sum, [9.782642, 5.217357])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[9.782642, 9.782642, 9.782642])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[19.418161,  8.782771,  2.000136])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[5.217357, 5.217357, 5.217357])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[7.581837, 6.217227, 7.999864])
-
-	d = [Exponential([2.1, 0.3, 0.1]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, priors=[0.7, 0.3])
-	model.summarize(X_masked, sample_weight=w, y=y)
-	assert_array_almost_equal(model._w_sum, [5.714504, 7.285496])
-	assert_array_almost_equal(model.distributions[0]._w_sum, 
-		[2.000132, 5.714504, 1.000132])
-	assert_array_almost_equal(model.distributions[0]._xw_sum, 
-		[2.269437e-07, 4.714635e+00, 1.319366e-04])
-	assert_array_almost_equal(model.distributions[1]._w_sum, 
-		[4.999868, 6.285496, 4.999868])
-	assert_array_almost_equal(model.distributions[1]._xw_sum, 
-		[7.      , 8.285364, 7.999868])
+def test_gmm_log_probability_raises(gmm, X, priors):
+	_test_raises(gmm.log_probability, X, priors)
 
 
-def test_masked_fit(model, X_masked, y):
-	d = [Exponential([2.1, 1.5, 1.0]), Exponential([1.5, 3.1, 2.2])]
-	model = GeneralMixtureModel(d, max_iter=5)
-	model.fit(X_masked, y=y)
+def test_gmm_predict(gmm, X, priors):
+	y_hat = gmm.predict(X)
+	assert_array_equal(y_hat, [0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0])
 
-	assert_array_almost_equal(model._w_sum, [0., 0.])
-	assert_array_almost_equal(model.priors, [0.499671, 0.500329])
-	assert_array_almost_equal(model._log_priors, 
-		numpy.log([0.499671, 0.500329]))
-'''
+	y_hat = gmm.predict(X, priors=priors)
+	assert_array_equal(y_hat, [0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0])	
+
+
+def test_gmm_predict_raises(gmm, X, priors):
+	_test_raises(gmm.predict, X, priors)
+
+
+def test_gmm_predict_proba(gmm, X, priors):
+	y_hat = gmm.predict_proba(X)
+	assert_array_almost_equal(y_hat, [
+		[5.2653e-01, 4.7347e-01],
+        [2.6385e-02, 9.7361e-01],
+        [1.1551e-07, 1.0000e+00],
+        [6.8830e-09, 1.0000e+00],
+        [9.7063e-01, 2.9372e-02],
+        [1.2660e-15, 1.0000e+00],
+        [9.6468e-01, 3.5317e-02],
+        [2.3451e-06, 1.0000e+00],
+        [9.5759e-01, 4.2413e-02],
+        [6.5741e-05, 9.9993e-01],
+        [9.9737e-01, 2.6323e-03]], 4)
+
+	y_hat = gmm.predict_proba(X, priors=priors)
+	assert_array_almost_equal(y_hat, [
+		[5.2653e-01, 4.7347e-01],
+        [2.6385e-02, 9.7361e-01],
+        [1.1551e-07, 1.0000e+00],
+        [6.8830e-09, 1.0000e+00],
+        [9.7063e-01, 2.9372e-02],
+        [1.2660e-15, 1.0000e+00],
+        [9.6468e-01, 3.5317e-02],
+        [2.3451e-06, 1.0000e+00],
+        [9.5759e-01, 4.2413e-02],
+        [6.5741e-05, 9.9993e-01],
+        [9.9737e-01, 2.6323e-03]], 4)	
+
+
+def test_gmm_predict_raises(gmm, X, priors):
+	_test_raises(gmm.predict_proba, X, priors)
+
+
+def test_gmm_predict_log_proba(gmm, X, priors):
+	y_hat = gmm.predict_log_proba(X)
+	assert_array_equal(y_hat, [
+		[-6.4145e-01, -7.4766e-01],
+        [-3.6350e+00, -2.6740e-02],
+        [-1.5974e+01,  0.0000e+00],
+        [-1.8794e+01,  0.0000e+00],
+        [-2.9812e-02, -3.5277e+00],
+        [-3.4303e+01,  0.0000e+00],
+        [-3.5955e-02, -3.3434e+00],
+        [-1.2963e+01, -2.3842e-06],
+        [-4.3338e-02, -3.1603e+00],
+        [-9.6298e+00, -6.5804e-05],
+        [-2.6357e-03, -5.9399e+00]], 4)
+
+	y_hat = gmm.predict_log_proba(X, priors=priors)
+	assert_array_equal(y_hat, [
+		[5.2653e-01, 4.7347e-01],
+        [2.6385e-02, 9.7361e-01],
+        [1.1551e-07, 1.0000e+00],
+        [6.8830e-09, 1.0000e+00],
+        [9.7063e-01, 2.9372e-02],
+        [1.2660e-15, 1.0000e+00],
+        [9.6468e-01, 3.5317e-02],
+        [2.3451e-06, 1.0000e+00],
+        [9.5759e-01, 4.2413e-02],
+        [6.5741e-05, 9.9993e-01],
+        [9.9737e-01, 2.6323e-03]])	
+
+
+def test_gmm_predict_raises(gmm, X, priors):
+	_test_raises(gmm.predict_log_proba, X, priors)

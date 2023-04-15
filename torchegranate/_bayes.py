@@ -28,7 +28,7 @@ class BayesMixin(torch.nn.Module):
 		self.register_buffer("_w_sum", torch.zeros(self.k, device=self.device))
 		self.register_buffer("_log_priors", torch.log(self.priors))
 
-	def _emission_matrix(self, X):
+	def _emission_matrix(self, X, priors=None):
 		"""Return the emission/responsibility matrix.
 
 		This method returns the log probability of each example under each
@@ -41,6 +41,17 @@ class BayesMixin(torch.nn.Module):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to evaluate. 
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 	
 		Returns
 		-------
@@ -51,13 +62,58 @@ class BayesMixin(torch.nn.Module):
 		X = _check_parameter(_cast_as_tensor(X), "X", ndim=2, 
 			shape=(-1, self.d), check_parameter=self.check_data)
 
+		priors = _check_parameter(_cast_as_tensor(priors), "priors",
+			ndim=2, shape=(X.shape[0], self.k), min_value=0.0, max_value=1.0,
+			value_sum=1.0, value_sum_dim=-1, check_parameter=self.check_data)
+
 		e = torch.empty(X.shape[0], self.k, device=self.device)
 		for i, d in enumerate(self.distributions):
 			e[:, i] = d.log_probability(X)
 
+		if priors is not None:
+			e += torch.log(priors)
+
 		return e + self._log_priors
 
-	def log_probability(self, X):
+	def probability(self, X, priors=None):
+		"""Calculate the probability of each example.
+
+		This method calculates the probability of each example given the
+		parameters of the distribution. The examples must be given in a 2D
+		format.
+
+		Note: This differs from some other probability calculation
+		functions, like those in torch.distributions, because it is not
+		returning the probability of each feature independently, but rather
+		the total probability of the entire example.
+
+
+		Parameters
+		----------
+		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
+			A set of examples to evaluate.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
+
+		Returns
+		-------
+		prob: torch.Tensor, shape=(-1,)
+			The probability of each example.
+		"""
+
+		return torch.exp(self.log_probability(X, priors=priors))
+
+	def log_probability(self, X, priors=None):
 		"""Calculate the log probability of each example.
 
 		This method calculates the log probability of each example given the
@@ -76,6 +132,17 @@ class BayesMixin(torch.nn.Module):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to evaluate.
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 
 		Returns
 		-------
@@ -83,10 +150,10 @@ class BayesMixin(torch.nn.Module):
 			The log probability of each example.
 		"""
 
-		e = self._emission_matrix(X)
+		e = self._emission_matrix(X, priors=priors)
 		return torch.logsumexp(e, dim=1)
 
-	def predict(self, X):
+	def predict(self, X, priors=None):
 		"""Calculate the label assignment for each example.
 
 		This method calculates the label for each example as the most likely
@@ -98,6 +165,17 @@ class BayesMixin(torch.nn.Module):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to summarize.
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 
 		Returns
 		-------
@@ -105,10 +183,10 @@ class BayesMixin(torch.nn.Module):
 			The predicted label for each example.
 		"""
 
-		e = self._emission_matrix(X)
+		e = self._emission_matrix(X, priors=priors)
 		return torch.argmax(e, dim=1)
 
-	def predict_proba(self, X):
+	def predict_proba(self, X, priors=None):
 		"""Calculate the posterior probabilities for each example.
 
 		This method calculates the posterior probabilities for each example
@@ -121,6 +199,17 @@ class BayesMixin(torch.nn.Module):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to summarize.
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 
 		Returns
 		-------
@@ -128,10 +217,10 @@ class BayesMixin(torch.nn.Module):
 			The posterior probabilities for each example under each component.
 		"""
 
-		e = self._emission_matrix(X)
+		e = self._emission_matrix(X, priors=priors)
 		return torch.exp(e - torch.logsumexp(e, dim=1, keepdims=True))
 		
-	def predict_log_proba(self, X):
+	def predict_log_proba(self, X, priors=None):
 		"""Calculate the log posterior probabilities for each example.
 
 		This method calculates the log posterior probabilities for each example
@@ -144,6 +233,17 @@ class BayesMixin(torch.nn.Module):
 		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, self.d)
 			A set of examples to summarize.
 
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Default is None.
+
 
 		Returns
 		-------
@@ -152,7 +252,7 @@ class BayesMixin(torch.nn.Module):
 			component.
 		"""
 
-		e = self._emission_matrix(X)
+		e = self._emission_matrix(X, priors=priors) 
 		return e - torch.logsumexp(e, dim=1, keepdims=True)
 
 	def from_summaries(self):

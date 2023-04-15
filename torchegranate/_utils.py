@@ -88,8 +88,8 @@ def _update_parameter(value, new_value, inertia=0.0, frozen=None):
 
 
 def _check_parameter(parameter, name, min_value=None, max_value=None, 
-	value_sum=None, value_set=None, dtypes=None, ndim=None, shape=None,
-	check_parameter=True, epsilon=1e-6):
+	value_sum=None, value_sum_dim=None, value_set=None, dtypes=None, ndim=None, 
+	shape=None, check_parameter=True, epsilon=1e-6):
 	"""Ensures that the parameter falls within a valid range.
 
 	This check accepts several optional conditions that can be used to ensure
@@ -119,6 +119,10 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 
 	value_sum: float or None, optional
 		The approximate sum, within eps, of the parameter. Default is None.
+
+	value_sum_dim: int or float, optional
+		What dimension to sum over. If None, sum over entire tensor. Default
+		is None.
 
 	value_set: tuple or list or set or None, optional
 		The set of values that each element in the parameter can take. Default
@@ -183,7 +187,12 @@ def _check_parameter(parameter, name, min_value=None, max_value=None,
 
 	if value_sum is not None:
 		if isinstance(parameter, vector):
-			if torch.abs(torch.sum(parameter) - value_sum) > epsilon:
+			if value_sum_dim is None:
+				delta = torch.sum(parameter) - value_sum
+			else:
+				delta = torch.sum(parameter, dim=value_sum_dim) - value_sum
+
+			if torch.any(torch.abs(delta) > epsilon):
 				raise ValueError("Parameter {} must sum to {}".format(name, 
 					value_sum))
 		else:
