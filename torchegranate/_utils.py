@@ -3,6 +3,7 @@
 
 import numpy
 import torch
+import collections
 
 from apricot import FacilityLocationSelection
 from apricot import FeatureBasedSelection
@@ -352,3 +353,122 @@ def _initialize_centroids(X, k, algorithm='first-k', random_state=None):
 	elif algorithm == 'submodular-feature-based':
 		selector = FeatureBasedSelection(k, random_state=random_state)
 		return selector.fit_transform(X)
+
+
+def partition_sequences(X, sample_weight=None, priors=None):
+	"""Partition a set of sequences into blobs of equal length.
+
+	This function will take in a list of sequences, where each sequence is
+	a different length, and group together sequences of the same length so that
+	batched operations can be more efficiently done on them. 
+
+	Alternatively, it can take in sequnces in the correct format and simply 
+	return them. The correct form is to be either a single tensor that has
+	three dimensions or a list of three dimensional tensors, where each
+	tensor contains all the sequences of the same length.
+
+	More concretely, the input to this function can be:
+
+		- A single 3D tensor, or blob of data that can be cast into a 3D
+		tensor, which gets returned
+
+		- A list of 3D tensors, or elements that can be cast into 3D tensors, 
+		which also gets returned
+
+		- A list of 2D tensors, which get partitioned into a list of 3D tensors
+
+
+	Parameters
+	----------
+	X: list or tensor
+		The input sequences to be partitioned if in an incorrect format.
+
+	sample_weight: list or tensor or None, optional
+		The input sequence weights for the sequences or None. If None, return
+		None. Default is None.
+
+	priors: list or tensor or None
+		The input sequence priors for the sequences or None. If None, return
+		None. Default is None.
+
+
+	Returns
+	-------
+	X_: list or tensor
+		The partitioned and grouped sequences.
+	"""
+
+	# If a 3D tensor has been passed in, return it
+	try:
+		X = [_check_parameter(_cast_as_tensor(X), "X", ndim=3)]
+
+		if sample_weight is not None:
+			sample_weight = [_check_parameter(_cast_as_tensor(sample_weight),
+				"sample_weight", min_value=0.0)]
+
+		if priors is not None:
+			priors = [_check_parameter(_cast_as_tensor(priors), "priors",
+				ndim=3, shape=X[0].shape)]
+
+		return X, sample_weight, priors
+	except:
+		pass
+
+	# Otherwise, cast all elements in the list as a tensor
+	X = [_cast_as_tensor(x) for x in X]
+
+	# If a list of 3D tensors has been passed in, return it
+	try:
+		X = [_check_parameter(x, "X", ndim=3) for x in X]
+
+		if sample_weight is not None:
+			sample_weight = [_check_parameter(_cast_as_tensor(w_),
+				"sample_weight", min_value=0.0) for w_ in sample_weight]
+
+		if priors is not None:
+			priors = [_check_parameter(_cast_as_tensor(p), "priors",
+				ndim=3, shape=X[i].shape) for i, p in enumerate(priors)]
+
+		if all([x.ndim == 3 for x in X]):
+			return X, sample_weight, priors
+	except:
+		pass
+
+	# Otherwise, group together same-sized examples
+	X_dict = collections.defaultdict(list)
+	sample_weight_dict = collections.defaultdict(list)
+	priors_dict = collections.defaultdict(list)
+
+	for i, x in enumerate(X):
+		x = _check_parameter(x, "X", ndim=2)
+		n = len(x)
+
+		X_dict[n].append(x)
+
+		if sample_weight is not None:
+			w = _check_parameter(_cast_as_tensor(sample_weight[i]), 
+				"sample_weight", min_value=0.0)
+
+			sample_weight_dict[n].append(w)
+
+		if priors is not None:
+			p = _check_parameter(_cast_as_tensor(priors[i]), "priors",
+				ndim=2, shape=x.shape)
+
+			priors_dict[n].append(p)
+
+	keys = sorted(X_dict.keys())
+	
+	X_ = [torch.stack(X_dict[key]) for key in keys]
+
+	if sample_weight is None:
+		sample_weight_ = None
+	else:
+		sample_weight_ = [torch.stack(sample_weight_dict[key]) for key in keys]
+
+	if priors is None:
+		priors_ = None
+	else:
+		priors_ = [torch.stack(priors_dict[key]) for key in keys]
+
+	return X_, sample_weight_, priors_

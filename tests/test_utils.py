@@ -3,10 +3,12 @@
 
 import numpy
 import torch
+import pytest
 
 from torchegranate._utils import _cast_as_tensor
 from torchegranate._utils import _update_parameter
 from torchegranate._utils import _check_parameter
+from torchegranate._utils import partition_sequences
 
 from nose.tools import assert_almost_equal
 from nose.tools import assert_equal
@@ -552,4 +554,530 @@ def test_check_parameters_shape():
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(1, 2, 1))
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(1, 2, -1))
 	assert_raises(ValueError, _check_parameter, x, "x", shape=(2, -1, -1))
-	
+
+
+###
+
+
+@pytest.fixture
+def X1():
+	return [[[0.5, 0.2], 
+		     [0.2, 0.1]],
+
+		    [[0.1, 0.2],
+		     [0.7, 0.2]],
+ 
+		    [[0.1, 0.4],
+		     [0.3, 0.1]],
+
+		    [[0.3, 0.1],
+		     [0.1, 0.6]]]
+
+
+@pytest.fixture
+def w1():
+	return [[0.1, 0.5], [0.1, 0.3], [0.5, 0.2], [0.2, 0.1]]
+
+
+@pytest.fixture
+def p1():
+	return [[[0.5, 0.5], 
+		  [0.5, 0.5]],
+
+		 [[0.7, 0.3],
+		  [0.3, 0.7]],
+
+		 [[1.0, 0.0],
+		  [0.5, 0.5]],
+
+		 [[0.0, 1.0],
+		  [0.0, 1.0]]]
+
+
+def test_partition_3d_X(X1):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		y, _, _ = partition_sequences(func(X1))
+
+		assert isinstance(y, list)
+		assert len(y) == 1
+
+		assert isinstance(y[0], torch.Tensor)
+		assert y[0].ndim == 3
+		assert y[0].shape == (4, 2, 2)
+		assert_array_almost_equal(X1, y[0])
+
+
+def test_partition_3d_Xw(X1, w1):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		y, w, p = partition_sequences(func(X1), sample_weight=func(w1))
+
+		assert isinstance(y, list)
+		assert len(y) == 1
+
+		assert isinstance(w, list)
+		assert len(w) == 1
+
+		assert p is None
+
+		assert isinstance(y[0], torch.Tensor)
+		assert y[0].ndim == 3
+		assert y[0].shape == (4, 2, 2)
+		assert_array_almost_equal(X1, y[0])
+
+		assert isinstance(w[0], torch.Tensor)
+		assert w[0].ndim == 2
+		assert w[0].shape == (4, 2)
+		assert_array_almost_equal(w1, w[0])
+
+
+def test_partition_3d_Xp(X1, p1):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		y, w, p = partition_sequences(func(X1), priors=func(p1))
+
+		assert isinstance(y, list)
+		assert len(y) == 1
+
+		assert w is None
+
+		assert isinstance(p, list)
+		assert len(p) == 1
+
+		assert isinstance(y[0], torch.Tensor)
+		assert y[0].ndim == 3
+		assert y[0].shape == (4, 2, 2)
+		assert_array_almost_equal(X1, y[0])
+
+		assert isinstance(p[0], torch.Tensor)
+		assert p[0].ndim == 3
+		assert p[0].shape == (4, 2, 2)
+		assert_array_almost_equal(p1, p[0])
+
+
+def test_partition_3d_Xwp(X1, w1, p1):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		y, w, p = partition_sequences(func(X1), sample_weight=func(w1), 
+			priors=func(p1))
+
+		assert isinstance(y, list)
+		assert len(y) == 1
+
+		assert isinstance(w, list)
+		assert len(w) == 1
+
+		assert isinstance(p, list)
+		assert len(p) == 1
+
+		assert isinstance(y[0], torch.Tensor)
+		assert y[0].ndim == 3
+		assert y[0].shape == (4, 2, 2)
+		assert_array_almost_equal(X1, y[0])
+
+		assert isinstance(w[0], torch.Tensor)
+		assert w[0].ndim == 2
+		assert w[0].shape == (4, 2)
+		assert_array_almost_equal(w1, w[0])
+
+		assert isinstance(p[0], torch.Tensor)
+		assert p[0].ndim == 3
+		assert p[0].shape == (4, 2, 2)
+		assert_array_almost_equal(p1, p[0])
+
+
+@pytest.fixture
+def X2():
+	return [[[[0.5, 0.2], 
+		      [0.2, 0.1]],
+
+		     [[0.1, 0.2],
+		      [0.7, 0.2]]],
+
+		    [[[0.1, 0.4],
+		      [0.3, 0.1],
+		      [0.1, 0.7]],
+
+		     [[0.3, 0.1],
+		      [0.1, 0.6],
+		      [0.1, 0.1]]]]
+
+
+@pytest.fixture
+def w2():
+	return [[[0.1, 0.5], [0.1, 0.3]], [[0.5, 0.2, 0.1], [0.2, 0.1, 0.0]]]
+
+
+@pytest.fixture
+def p2():
+	return [[[[0.5, 0.5], 
+		      [1.0, 0.0]],
+
+		     [[0.5, 0.5],
+		      [0.5, 0.5]]],
+
+		    [[[0.5, 0.5],
+		      [0.7, 0.3],
+		      [0.1, 0.9]],
+
+		     [[1.0, 0.0],
+		      [1.0, 0.0],
+		      [1.0, 0.0]]]]
+
+
+def test_partition_3ds_X(X2):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X2_ = [func(x) for x in X2]
+
+		y, _, _ = partition_sequences(X2)
+
+		assert isinstance(y, list)
+		assert len(y) == 2
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == (2, i+2, 2)
+			assert_array_almost_equal(y_, X2[i])
+
+
+def test_partition_3ds_X(X2):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X2_ = [func(x) for x in X2]
+
+		y, _, _ = partition_sequences(X2_)
+
+		assert isinstance(y, list)
+		assert len(y) == 2
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == (2, i+2, 2)
+			assert_array_almost_equal(y_, X2[i])
+
+
+def test_partition_3ds_Xw(X2, w2):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X2_ = [func(x) for x in X2]
+		w2_ = [func(w) for w in w2]
+
+		y, w, p = partition_sequences(X2_, sample_weight=w2_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 2
+
+		assert isinstance(w, list)
+		assert len(w) == 2
+
+		assert p == None
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == (2, i+2, 2)
+			assert_array_almost_equal(y_, X2[i])
+
+		for i, w_ in enumerate(w):
+			assert isinstance(w_, torch.Tensor)
+			assert w_.ndim == 2
+			assert w_.shape == (2, i+2)
+			assert_array_almost_equal(w_, w2[i])
+
+
+def test_partition_3ds_Xp(X2, p2):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X2_ = [func(x) for x in X2]
+		p2_ = [func(p) for p in p2]
+
+		y, w, p = partition_sequences(X2_, priors=p2_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 2
+
+		assert isinstance(p, list)
+		assert len(p) == 2
+
+		assert w is None
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == (2, i+2, 2)
+			assert_array_almost_equal(y_, X2[i])
+
+		for i, p_ in enumerate(p):
+			assert isinstance(p_, torch.Tensor)
+			assert p_.ndim == 3
+			assert p_.shape == (2, i+2, 2)
+			assert_array_almost_equal(p_, p2[i])
+
+
+def test_partition_3ds_Xwp(X2, w2, p2):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X2_ = [func(x) for x in X2]
+		w2_ = [func(w) for w in w2]
+		p2_ = [func(p) for p in p2]
+
+		y, w, p = partition_sequences(X2_, sample_weight=w2_, priors=p2_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 2
+
+		assert isinstance(p, list)
+		assert len(p) == 2
+
+		assert isinstance(w, list)
+		assert len(w) == 2
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == (2, i+2, 2)
+			assert_array_almost_equal(y_, X2[i])
+
+		for i, w_ in enumerate(w):
+			assert isinstance(w_, torch.Tensor)
+			assert w_.ndim == 2
+			assert w_.shape == (2, i+2)
+			assert_array_almost_equal(w_, w2[i])
+
+		for i, p_ in enumerate(p):
+			assert isinstance(p_, torch.Tensor)
+			assert p_.ndim == 3
+			assert p_.shape == (2, i+2, 2)
+			assert_array_almost_equal(p_, p2[i])
+
+
+@pytest.fixture
+def X3():
+	return [[[0.5, 0.2], 
+		     [0.2, 0.1]],
+
+		    [[0.1, 0.2],
+		     [0.7, 0.2]],
+
+		    [[0.1, 0.4],
+		     [0.3, 0.1],
+		     [0.1, 0.7]],
+
+		    [[0.3, 0.1],
+		     [0.1, 0.6],
+		     [0.1, 0.1]],
+
+		    [[0.5, 0.1]],
+
+		    [[0.5, 0.2],
+		     [0.3, 0.4]]]
+
+
+@pytest.fixture
+def w3():
+	return [[0.1, 0.5], [0.1, 0.3], [0.5, 0.2, 0.1], [0.2, 0.1, 0.3],
+		[0.1], [0.6, 0.4]]
+
+
+@pytest.fixture
+def p3():
+	return [[[0.5, 0.5], 
+		     [0.5, 0.5]],
+
+		    [[0.9, 0.1],
+		     [0.0, 1.0]],
+
+		    [[0.5, 0.5],
+		     [0.5, 0.5],
+		     [0.0, 1.0]],
+
+		    [[0.0, 1.0],
+		     [0.0, 1.0],
+		     [1.0, 0.0]],
+
+		    [[0.5, 0.5]],
+
+		    [[0.7, 0.3],
+		     [0.3, 0.7]]]
+
+
+def test_partition_2ds_X(X3):
+	X_batches = [
+		[[[0.5, 0.1]]],
+
+		[[[0.5, 0.2], 
+		  [0.2, 0.1]],
+
+		 [[0.1, 0.2],
+		  [0.7, 0.2]],
+
+		 [[0.5, 0.2],
+		  [0.3, 0.4]]],
+
+		[[[0.1, 0.4],
+		  [0.3, 0.1],
+		  [0.1, 0.7]],
+
+		  [[0.3, 0.1],
+		   [0.1, 0.6],
+		   [0.1, 0.1]]]]
+
+
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X3_ = [func(x) for x in X3]
+
+		y, _, _ = partition_sequences(X3_)
+
+		assert isinstance(y, list)
+		assert len(y) == 3
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == ([1, 3, 2][i], i+1, 2)
+			assert_array_almost_equal(y_, X_batches[i])
+
+
+def test_partition_2ds_Xw(X3, w3):
+	w_batches = [[[0.1]], [[0.1, 0.5], [0.1, 0.3], [0.6, 0.4]], 
+		[[0.5, 0.2, 0.1], [0.2, 0.1, 0.3]]]
+
+
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X3_ = [func(x) for x in X3]
+		w3_ = [func(w) for w in w3]
+
+		y, w, p = partition_sequences(X3_, sample_weight=w3_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 3
+
+		assert isinstance(w, list)
+		assert len(w) == 3
+
+		assert p == None
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == ([1, 3, 2][i], i+1, 2)
+
+		for i, w_ in enumerate(w):
+			assert isinstance(w_, torch.Tensor)
+			assert w_.ndim == 2
+			assert w_.shape == ([1, 3, 2][i], i+1)
+			assert_array_almost_equal(w_, w_batches[i])
+
+
+def test_partition_2ds_Xp(X3, p3):
+	p_batches = [
+		[[[0.5, 0.5]]],
+
+		[[[0.5, 0.5], 
+		  [0.5, 0.5]],
+
+		 [[0.9, 0.1],
+		  [0.0, 1.0]],
+
+		 [[0.7, 0.3],
+		  [0.3, 0.7]]],
+
+		[[[0.5, 0.5],
+		  [0.5, 0.5],
+		  [0.0, 1.0]],
+
+		 [[0.0, 1.0],
+		  [0.0, 1.0],
+		  [1.0, 0.0]]]]
+
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X3_ = [func(x) for x in X3]
+		p3_ = [func(p) for p in p3]
+
+		y, w, p = partition_sequences(X3_, priors=p3_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 3
+
+		assert isinstance(p, list)
+		assert len(p) == 3
+
+		assert w is None
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == ([1, 3, 2][i], i+1, 2)
+
+		for i, p_ in enumerate(p):
+			assert isinstance(p_, torch.Tensor)
+			assert p_.ndim == 3
+			assert p_.shape == ([1, 3, 2][i], i+1, 2)
+			assert_array_almost_equal(p_, p_batches[i])
+
+
+def test_partition_2ds_Xwp(X3, w3, p3):
+	funcs = (lambda x: x, tuple, numpy.array, 
+		lambda x: torch.from_numpy(numpy.array(x)))
+
+	for func in funcs:
+		X3_ = [func(x) for x in X3]
+		w3_ = [func(w) for w in w3]
+		p3_ = [func(p) for p in p3]
+
+		y, w, p = partition_sequences(X3_, sample_weight=w3_, priors=p3_) 
+
+		assert isinstance(y, list)
+		assert len(y) == 3
+
+		assert isinstance(p, list)
+		assert len(w) == 3
+
+		assert isinstance(p, list)
+		assert len(p) == 3
+
+		for i, y_ in enumerate(y):
+			assert isinstance(y_, torch.Tensor)
+			assert y_.ndim == 3
+			assert y_.shape == ([1, 3, 2][i], i+1, 2)
+
+		for i, w_ in enumerate(w):
+			assert isinstance(w_, torch.Tensor)
+			assert w_.ndim == 2
+			assert w_.shape == ([1, 3, 2][i], i+1)
+
+		for i, p_ in enumerate(p):
+			assert isinstance(p_, torch.Tensor)
+			assert p_.ndim == 3
+			assert p_.shape == ([1, 3, 2][i], i+1, 2)

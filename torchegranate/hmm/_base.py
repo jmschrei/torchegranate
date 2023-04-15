@@ -8,6 +8,7 @@ import torch
 from .._utils import _cast_as_tensor
 from .._utils import _cast_as_parameter
 from .._utils import _check_parameter
+from .._utils import partition_sequences
 
 from ..distributions._distribution import Distribution
 
@@ -515,33 +516,60 @@ class _BaseHMM(Distribution):
 		return torch.argmax(self.predict_log_proba(X, priors=priors), dim=-1)
 
 	def fit(self, X, sample_weight=None, priors=None):
-		"""Fit the model to optionally weighted examples.
+		"""Fit the model to sequences with optional weights and priors.
 
-		This method implements the core of the learning process. For a hidden
-		Markov model, this involves performing EM until the distributions that
-		are being fit converge according to the threshold set by `tol`, or
-		until the maximum number of iterations has been hit. Sometimes, this
-		is called the Baum-Welch algorithm.
+		This method implements the core of the learning process. For hidden
+		Markov models, this is a form of EM called "Baum-Welch" or "structured
+		EM". This iterative algorithm will proceed until converging, either
+		according to the threshold set by `tol` or until the maximum number
+		of iterations set by `max_iter` has been hit.
 
 		This method is largely a wrapper around the `summarize` and
 		`from_summaries` methods. It's primary contribution is serving as a
 		loop around these functions and to monitor convergence.
 
+		Unlike other HMM methods, this method can handle variable length
+		sequences by accepting a list of tensors where each tensor has a
+		different sequence length. Then, summarization is done on each tensor
+		sequentially. This will provide an exact update as if the entire data
+		set was seen at the same time but will allow batched operations to be
+		performed on each variable length tensor.
+
 
 		Parameters
 		----------
-		X: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
-			A set of examples to evaluate. 
+		X: list, numpy.ndarray, torch.Tensor, shape=(-1, len, self.d)
+			A set of examples to evaluate. Because sequences can be variable
+			length, there are three ways to format the sequences.
+			
+				1. Pass in a tensor of shape (n, length, dim), which can only 
+				be done when each sequence is the same length. 
 
-		y: list, tuple, numpy.ndarray, torch.Tensor, shape=(-1, len), optional 
-			A set of labels with the same number of examples and length as the
-			observations that indicate which node in the model that each
-			observation should be assigned to. Passing this in means that the
-			model uses labeled training instead of Baum-Welch. Default is None.
+				2. Pass in a list of 3D tensors where each tensor has the shape 
+				(n, length, dim). In this case, each tensor is a collection of 
+				sequences of the same length and so sequences of different 
+				lengths can be trained on. 
 
-		sample_weight: list, tuple, numpy.ndarray, torch.Tensor, optional
-			A set of weights for the examples. This can be either of shape
-			(-1, self.d) or a vector of shape (-1,). Default is ones.
+				3. Pass in a list of 2D tensors where each tensor has the shape
+				(length, dim). In this case, sequences of the same length will
+				be grouped together into the same tensor and fitting will
+				proceed as if you had passed in data like way 2.
+
+		sample_weight: list, numpy.ndarray, torch.Tensor or None, optional
+			A set of weights for the examples. These must follow the same format
+			as X.
+
+		priors: list, numpy.ndarray, torch.Tensor, shape=(-1, -1, self.k)
+			Prior probabilities of assigning each symbol to each node. If not
+			provided, do not include in the calculations (conceptually
+			equivalent to a uniform probability, but without scaling the
+			probabilities). This can be used to assign labels to observatons
+			by setting one of the probabilities for an observation to 1.0.
+			Note that this can be used to assign hard labels, but does not
+			have the same semantics for soft labels, in that it only
+			influences the initial estimate of an observation being generated
+			by a component, not gives a target. Must be formatted in the same
+			shape as X. Default is None.
 
 
 		Returns
@@ -549,15 +577,33 @@ class _BaseHMM(Distribution):
 		self
 		"""
 
+		X, sample_weight, priors = partition_sequences(X, 
+			sample_weight=sample_weight, priors=priors)
+
+		# Initialize by concatenating across sequences
 		if not self._initialized:
-			self._initialize(X, sample_weight=sample_weight)
+			X_ = torch.cat(X, dim=1)
+
+			if sample_weight is None:
+				self._initialize(X_)
+			else:
+				w_ = torch.cat(sample_weight, dim=1)
+				self._initialize(X_, sample_weight=w_)
+
 
 		logp, last_logp = None, None
 		for i in range(self.max_iter):
 			start_time = time.time()
-			logp = self.summarize(X, sample_weight=sample_weight, 
-				priors=priors).sum()
 
+			# Train loop across all tensors
+			logp = 0
+			for j, X_ in enumerate(X):
+				w_ = None if sample_weight is None else sample_weight[j]
+				p_ = None if priors is None else priors[j]
+
+				logp += self.summarize(X_, sample_weight=w_, priors=p_).sum()
+
+			# Calculate and check improvement and optionally print it
 			if i > 0:
 				improvement = logp - last_logp
 				duration = time.time() - start_time
@@ -573,9 +619,14 @@ class _BaseHMM(Distribution):
 			last_logp = logp
 			self.from_summaries()
 
+		# Calculate for the last iteration
 		if self.verbose:
-			logp = self.summarize(X, sample_weight=sample_weight, 
-				priors=priors).sum()
+			logp = 0
+			for j, X_ in enumerate(X):
+				w_ = None if sample_weight is None else sample_weight[j]
+				p_ = None if priors is None else priors[j]
+				
+				logp += self.summarize(X_, sample_weight=w_, priors=p_).sum()
 
 			improvement = logp - last_logp
 			duration = time.time() - start_time
