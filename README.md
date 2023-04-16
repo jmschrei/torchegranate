@@ -34,7 +34,7 @@ The ultimate goal is for this repository to include all of the useful features f
 - [x] v0.2.0: Addition of GPU support for all existing operations and serialization via PyTorch
 - [x] v0.3.0: Addition of missing value support for all existing algorithms
 - [x] v0.4.0: Addition of Bayesian networks and factor graphs
-- [ ] v0.5.0: Addition of sampling algorithms for each existing method
+- [x] v0.5.0: Addition of sampling algorithms for each existing method
 - [ ] v0.6.0: Addition of pass-through for forward and backward algorithms to enable direct inclusion of these components into PyTorch models
 
 
