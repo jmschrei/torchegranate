@@ -14,7 +14,9 @@ Special shout-out to [NumFOCUS](https://numfocus.org/) for supporting this work 
 
 ### Installation
 
-`pip install torchegranate`
+`pip install torchegranate` 
+
+Although torchegranate has been merged back into pomegranate, it will remain available on PyPI for anyone who wants to use this version.
 
 ### Why a Rewrite?
 
