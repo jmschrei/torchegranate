@@ -3,10 +3,8 @@
 [![Downloads](https://pepy.tech/badge/torchegranate)](https://pepy.tech/project/torchegranate) ![](https://github.com/jmschrei/torchegranate/actions/workflows/python-package.yml/badge.svg)
 
 > **Warning**
-> torchegranate is currently under rapid active development and the API has not yet been finalized. Major changes will be noted in the CHANGELOG. 
+> torchegranate v0.5.0 has been merged back into pomegranate as v1.0.0. Thank you all for your support during this rewrite! PLEASE TAKE ALL FURTHER QUESTIONS, ISSUES, AND COMMENTS BACK TO THE POMEGRANATE REPO.
 
-> **Note**
-> This is a temporary repository that will host code until the main functionality of pomegranate is reproduced. Then, the code here will be merged back into the main pomegranate repo.
 
 torchegranate is a rewrite of the [pomegranate](https://github.com/jmschrei/pomegranate) library to use PyTorch as a backend. It implements probabilistic models with a modular implementation, enabling greater flexibility in terms of model creation than most models allow. Specifically, one can drop any probability distribution into any compositional model, e.g., drop Poisson distributions into a mixture model, to create any model desired without needing to explicitly hardcode each potential model. Because one is defining the distributions to use in each of the compositional models, there is no limitation on the models being homogenous -- one can create a mixture of a exponential distribution and a gamma distribution just as easily as creating a mixture entirely composed of gamma distributions. 
 
