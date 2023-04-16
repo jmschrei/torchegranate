@@ -323,7 +323,7 @@ class DenseHMM(_BaseHMM):
 		f: torch.Tensor, shape=(-1, -1, self.n_distributions)
 			The log probabilities calculated by the forward algorithm.
 		"""
-
+		
 		emissions = _check_inputs(self, X, emissions, priors)
 		l = emissions.shape[1]
 

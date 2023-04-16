@@ -66,7 +66,8 @@ class BayesMixin(torch.nn.Module):
 			ndim=2, shape=(X.shape[0], self.k), min_value=0.0, max_value=1.0,
 			value_sum=1.0, value_sum_dim=-1, check_parameter=self.check_data)
 
-		e = torch.empty(X.shape[0], self.k, device=self.device)
+		d = X.shape[0]
+		e = torch.empty(d, self.k, device=self.device, dtype=self.dtype)
 		for i, d in enumerate(self.distributions):
 			e[:, i] = d.log_probability(X)
 

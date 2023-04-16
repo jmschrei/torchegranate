@@ -213,16 +213,18 @@ class _BaseHMM(Distribution):
 			X = X.reshape(-1, X.shape[-1])
 
 			if sample_weight is None:
-				sample_weight = torch.ones(1).expand(X.shape[0], 1)
+				sample_weight = torch.ones(1, dtype=self.dtype, 
+					device=self.device).expand(X.shape[0], 1)
 			else:
 				sample_weight = _check_parameter(_cast_as_tensor(
 					sample_weight).reshape(-1, 1), "sample_weight", 
 					min_value=0., ndim=1, shape=(len(X),), 
 					check_parameter=self.check_data).reshape(-1, 1)
 
-			y_hat = KMeans(self.n_distributions, init=self.init, max_iter=1, 
-				random_state=self.random_state).fit_predict(X, 
-				sample_weight=sample_weight)
+			model = KMeans(self.n_distributions, init=self.init, max_iter=1, 
+				random_state=self.random_state).to(self.device)
+
+			y_hat = model.fit_predict(X, sample_weight=sample_weight)
 
 			for i in range(self.n_distributions):
 				self.distributions[i].fit(X[y_hat == i], 

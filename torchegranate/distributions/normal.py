@@ -103,7 +103,8 @@ class Normal(Distribution):
 			The dimensionality the distribution is being initialized to.
 		"""
 
-		self.means = _cast_as_parameter(torch.zeros(d, device=self.device))
+		self.means = _cast_as_parameter(torch.zeros(d, dtype=self.dtype,
+			device=self.device))
 		
 		if self.covariance_type == 'full':
 			self.covs = _cast_as_parameter(torch.zeros(d, d, 
